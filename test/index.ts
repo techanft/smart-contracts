@@ -24,6 +24,17 @@ const getCurrentTS = () => {
   return Math.round(new Date().getTime() / 1000);
 };
 
+const calculateOwnershipExtension = async (instance: Listing, transferedAmount: BigNumber) => {
+  const initalOwnership = await instance.ownership();
+  const listingValue = await instance.value();
+  const listingRetentionRate = (await instance.retentionRate()).toNumber();
+
+  const tokenToPayDaily = listingValue.mul(listingRetentionRate).div(100);
+  const creditInDays = transferedAmount.div(tokenToPayDaily);
+
+  return initalOwnership.add(creditInDays.mul(86400));
+};
+
 // function calculateReward(StakingModel memory stakingRecord) private pure returns (uint256) {
 //   uint256 stakingDays = (stakingRecord._end).sub(stakingRecord._start).div(86400);
 //   uint256 reward = stakingRecord._amount.mul(stakingRecord._apy).div(100).div(365).mul(stakingDays);
@@ -52,7 +63,8 @@ describe('ANFT Token', () => {
     stakingAddr: SignerWithAddress,
     listingOwner: SignerWithAddress,
     stakeholder1: SignerWithAddress,
-    stakeholder2: SignerWithAddress;
+    stakeholder2: SignerWithAddress,
+    listingOwner2: SignerWithAddress;
   let ANFTFactory: ANFTToken__factory;
   let ANFTInstance: ANFTToken;
   const listingAPY1: number = 50;
@@ -61,7 +73,7 @@ describe('ANFT Token', () => {
   const listingValue: number = 1000;
 
   beforeEach(async () => {
-    [deployer, stakingAddr, listingOwner, stakeholder1, stakeholder2] = await ethers.getSigners();
+    [deployer, stakingAddr, listingOwner, stakeholder1, stakeholder2, listingOwner2] = await ethers.getSigners();
     ANFTFactory = await ethers.getContractFactory('ANFTToken');
     ANFTInstance = await ANFTFactory.connect(deployer).deploy(stakingAddr.address);
     await ANFTInstance.deployed();
@@ -114,7 +126,7 @@ describe('ANFT Token', () => {
     it("New listing's value is the defined value", async () => {
       expect(await listingInstance.value()).to.equal(tokenAmountBN(listingValue));
     });
-    
+
     it('New listing has apy & minimum configuration', async () => {
       const { _apy, _minimum } = await ANFTInstance.listingPrograms(listingAddress);
       expect(_apy.toNumber()).to.equal(listingAPY1);
@@ -154,12 +166,68 @@ describe('ANFT Token', () => {
 
     it('Listing validator is the token deployer', async () => {
       expect(await listingInstance.validator()).to.equal(deployer.address);
-    })
+    });
 
+    it('Validator can and only validator can update listing value, owner, rententionRate', async () => {
+      expect(await listingInstance.owner()).equals(listingOwner.address);
+
+      await listingInstance.connect(deployer).updateOwner(listingOwner2.address);
+
+      expect(await listingInstance.owner()).equals(listingOwner2.address);
+
+      const initialRetentionRate = 1;
+      expect(await listingInstance.retentionRate()).equals(BigNumber.from(initialRetentionRate));
+
+      const newRetentionRate = 10;
+      await listingInstance.connect(deployer).updateRetenionRate(newRetentionRate);
+      expect(await listingInstance.retentionRate()).equals(BigNumber.from(newRetentionRate));
+
+      expect((await listingInstance.value()).eq(listingValue));
+      await listingInstance.connect(deployer).updateValue(listingValue * 2);
+      expect((await listingInstance.value()).eq(listingValue * 2));
+
+      await expect(listingInstance.connect(stakeholder1).updateOwner(stakeholder1.address)).to.be.revertedWith(
+        'Unauthorized'
+      );
+      await expect(listingInstance.connect(stakeholder1).updateRetenionRate(initialRetentionRate)).to.be.revertedWith(
+        'Unauthorized'
+      );
+      await expect(listingInstance.connect(stakeholder1).updateRetenionRate(listingValue * 3)).to.be.revertedWith(
+        'Unauthorized'
+      );
+    });
+
+    it('Owner can extend ownership of a listing', async () => {
+      const initAmount = tokenAmountBN(10_000);
+      await ANFTInstance.connect(deployer).transfer(stakeholder1.address, initAmount);
+
+      const userBalance_1 = await ANFTInstance.balanceOf(stakeholder1.address);
+      const deployerAccount_1 = await ANFTInstance.balanceOf(deployer.address);
+
+      const amountToTransfer = tokenAmountBN(1_000);
+
+      const expectedOwnershipAfterExtending = await calculateOwnershipExtension(listingInstance, amountToTransfer);
+
+      await expect(
+        ANFTInstance.connect(stakeholder1).extendListingOwnership(initAmount.add(1), listingAddress)
+      ).to.be.revertedWith('ERC20: transfer amount exceeds balance');
+
+      await ANFTInstance.connect(stakeholder1).extendListingOwnership(amountToTransfer, listingAddress);
+
+      expect(await listingInstance.ownership()).equals(expectedOwnershipAfterExtending);
+
+      const userBalance_2 = await ANFTInstance.balanceOf(stakeholder1.address);
+      const deployerAccount_2 = await ANFTInstance.balanceOf(deployer.address);
+      expect(userBalance_2.eq(userBalance_1.add(amountToTransfer)));
+      expect(deployerAccount_2.eq(deployerAccount_1.sub(amountToTransfer)));
+    });
+
+    it('Ownership Extension can only be triggered by calling extendListingOwnership from token contract', async () => {
+      await expect(listingInstance.connect(stakeholder1).extendOwnership(tokenAmountBN(10_000))).to.be.revertedWith("Unauthorized!");
+    });
   });
 
   describe('Staking', function () {
-    let listing__factory: Listing__factory;
     let listingAddress1: string;
     let listingAddress2: string;
 
@@ -170,8 +238,6 @@ describe('ANFT Token', () => {
     });
 
     beforeEach(async () => {
-      listing__factory = await ethers.getContractFactory('Listing');
-
       const listingCreationData = await ANFTInstance.createListing(
         listingOwner.address,
         tokenAmountBN(listingValue),
@@ -184,8 +250,6 @@ describe('ANFT Token', () => {
     });
 
     beforeEach(async () => {
-      listing__factory = await ethers.getContractFactory('Listing');
-
       const listingCreationData = await ANFTInstance.createListing(
         listingOwner.address,
         tokenAmountBN(listingValue),
@@ -341,9 +405,9 @@ describe('ANFT Token', () => {
       expect(stakingInfo._active).equals(true);
 
       expect(stakingInfo._start).equals(BigNumber.from(stakeBlockTimeStamp));
-      // Requested end time (sent from users) is 50 seconds slower than actual _end time state recorded
+      // Requested end time (sent from users) is somewhat slower than actual _end time state recorded
       expect(BigNumber.from(stakeBlockTimeStamp + minimumStakingPeriod * 5).sub(stakingInfo._end)).lte(
-        BigNumber.from(60)
+        BigNumber.from(86400 / 2)
       );
     });
 
@@ -470,8 +534,12 @@ describe('ANFT Token', () => {
       await ANFTInstance.connect(listingOwner).supplyRewardPool(tokenAmountBN(1_000_000), listingAddress1);
 
       await ANFTInstance.connect(stakeholder1).claimReward(stakingIndex1);
-      await expect(ANFTInstance.connect(stakeholder1).claimReward(stakingIndex1)).to.be.revertedWith('Staking: Reward claimed');
-      await expect(ANFTInstance.connect(stakeholder1).claimReward(stakingIndex2)).to.be.revertedWith('Staking: Unauthorized');
+      await expect(ANFTInstance.connect(stakeholder1).claimReward(stakingIndex1)).to.be.revertedWith(
+        'Staking: Reward claimed'
+      );
+      await expect(ANFTInstance.connect(stakeholder1).claimReward(stakingIndex2)).to.be.revertedWith(
+        'Staking: Unauthorized'
+      );
     });
 
     it('User cant stake more tokens than the amount of tokens they own', async () => {
@@ -479,22 +547,23 @@ describe('ANFT Token', () => {
 
       const SH1_Balance_1 = await ANFTInstance.balanceOf(stakeholder1.address);
 
-      await expect(ANFTInstance.connect(stakeholder1).stake(
-        SH1_Balance_1.add(1),
-        listingAddress1,
-        getCurrentTS() + minimumStakingPeriod * 5
-      )).to.be.reverted;
-      
+      await expect(
+        ANFTInstance.connect(stakeholder1).stake(
+          SH1_Balance_1.add(1),
+          listingAddress1,
+          getCurrentTS() + minimumStakingPeriod * 5
+        )
+      ).to.be.revertedWith('ERC20: transfer amount exceeds balance');
 
       const SH1_Balance_2 = await ANFTInstance.balanceOf(stakeholder1.address);
       expect(SH1_Balance_1.eq(SH1_Balance_2));
     });
-    
+
     it('Listing pool state is updated properly if reward is claimed successfully', async () => {
       await ANFTInstance.connect(listingOwner).supplyRewardPool(tokenAmountBN(1_000_000), listingAddress1);
 
       const listing1PoolState_1 = await ANFTInstance.listingStakingInfo(listingAddress1);
-      
+
       const stakeInfo = await ANFTInstance.stakings(stakingIndex1);
       const expectedReward = calculateReward(stakeInfo);
 
@@ -504,9 +573,6 @@ describe('ANFT Token', () => {
       expect(listing1PoolState_2._stakingPool.eq(listing1PoolState_1._stakingPool.add(stakeInfo._amount)));
       expect(listing1PoolState_2._rewardingPool.eq(listing1PoolState_1._rewardingPool.add(expectedReward)));
       expect(listing1PoolState_2._ownerSupply.eq(listing1PoolState_1._ownerSupply.add(expectedReward)));
-
     });
   });
-
-
 });

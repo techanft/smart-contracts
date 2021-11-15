@@ -2,6 +2,7 @@
 pragma solidity ^0.8.0;
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 
+import "hardhat/console.sol";
 
 contract Staking {
     using SafeMath for uint;
@@ -14,7 +15,7 @@ contract Staking {
     }
     mapping (address => ProgramModel) public listingPrograms;
     
-    uint256 private stakingIndex;
+    uint256 public stakingIndex;
     
     // Staking list for each listing
     struct StakingModel {
@@ -50,8 +51,7 @@ contract Staking {
             _amount : _value,
             _apy : listingProgram._apy,
             _active : true
-        });
-        
+        });        
         
         stakings[stakingIndex] = newStake;
         
@@ -74,20 +74,20 @@ contract Staking {
     function _claimReward(uint256 _stakingIndex) internal virtual returns(uint256) {
         StakingModel storage stakingRecord = stakings[_stakingIndex];
         
-        require(stakingRecord._stakeholder == msg.sender, "Unauthorized!");
-        require(stakingRecord._active, "Reward claimed");
+        require(stakingRecord._stakeholder == msg.sender, "Staking: Unauthorized!");
+        require(stakingRecord._active, "Staking: Reward claimed");
         // require(stakingRecord._end <= block.timestamp, "Staking: Comeback to claim later");
         
-        
         uint256 reward = calculateReward(stakingRecord);
-        
+        require(listingStakingInfo[stakingRecord._listing]._ownerSupply >= reward, "Rewarding pool requires more supply!");
         
         stakingRecord._active = false;
+
         listingStakingInfo[stakingRecord._listing]._stakingPool = listingStakingInfo[stakingRecord._listing]._stakingPool.sub(stakingRecord._amount);
         listingStakingInfo[stakingRecord._listing]._rewardingPool = listingStakingInfo[stakingRecord._listing]._rewardingPool.sub(reward);
         listingStakingInfo[stakingRecord._listing]._ownerSupply = listingStakingInfo[stakingRecord._listing]._ownerSupply.sub(reward);
-        
-        return reward + stakingRecord._amount;
+
+        return reward.add(stakingRecord._amount);
     }
     
     function calculateReward(StakingModel memory stakingRecord) private pure returns (uint256) {

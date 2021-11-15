@@ -40,5 +40,11 @@ contract ANFTToken is ERC20, Ownable, Staking {
         uint256 totalReward = _claimReward(_stakingIndex);
         super._transfer(stakingAddress, msg.sender, totalReward);
     }
+
+    function extendListingOwnership(uint256 _value, address _listingAddr) public {
+        super._transfer(msg.sender, super.owner(), _value);
+        Listing( _listingAddr).extendOwnership(_value);
+
+    }
 }
 

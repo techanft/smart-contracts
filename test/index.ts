@@ -1,11 +1,9 @@
-import { Deferrable } from '@ethersproject/properties';
-import { TransactionRequest } from '@ethersproject/providers';
+import { Event } from '@ethersproject/contracts';
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
 import { expect } from 'chai';
 import { BigNumber, ContractReceipt } from 'ethers';
 import { ethers } from 'hardhat';
 import { ANFTToken, ANFTToken__factory, Listing, Listing__factory } from '../typechain';
-import { Event } from '@ethersproject/contracts';
 
 const tokenAmountBN = (input: number) => {
   return BigNumber.from(input).mul(BigNumber.from(10).pow(18));
@@ -35,11 +33,6 @@ const calculateOwnershipExtension = async (instance: Listing, transferedAmount: 
   return initalOwnership.add(creditInDays.mul(86400));
 };
 
-// function calculateReward(StakingModel memory stakingRecord) private pure returns (uint256) {
-//   uint256 stakingDays = (stakingRecord._end).sub(stakingRecord._start).div(86400);
-//   uint256 reward = stakingRecord._amount.mul(stakingRecord._apy).div(100).div(365).mul(stakingDays);
-//   return reward;
-// }
 interface IStakingInfo {
   _stakeholder: string;
   _listing: string;
@@ -55,7 +48,6 @@ const calculateReward = (stakingInfo: IStakingInfo): BigNumber => {
   const stakingDays = _end.sub(_start).div(86400);
   const reward = _amount.mul(_apy).div(100).div(365).mul(stakingDays);
   return reward;
-  // return reward.toNumber()
 };
 
 describe('ANFT Token', () => {
@@ -64,6 +56,8 @@ describe('ANFT Token', () => {
     listingOwner: SignerWithAddress,
     stakeholder1: SignerWithAddress,
     stakeholder2: SignerWithAddress,
+    validator: SignerWithAddress,
+    validator2: SignerWithAddress,
     listingOwner2: SignerWithAddress;
   let ANFTFactory: ANFTToken__factory;
   let ANFTInstance: ANFTToken;
@@ -73,15 +67,17 @@ describe('ANFT Token', () => {
   const listingValue: number = 1000;
 
   beforeEach(async () => {
-    [deployer, stakingAddr, listingOwner, stakeholder1, stakeholder2, listingOwner2] = await ethers.getSigners();
+    [deployer, stakingAddr, listingOwner, stakeholder1, stakeholder2, listingOwner2, validator, validator2] = await ethers.getSigners();
     ANFTFactory = await ethers.getContractFactory('ANFTToken');
     ANFTInstance = await ANFTFactory.connect(deployer).deploy(stakingAddr.address);
     await ANFTInstance.deployed();
   });
 
   describe('Deployment', function () {
-    it('Owner is the deployer address', async () => {
-      expect(await ANFTInstance.owner()).to.equal(deployer.address);
+    it('deployer account has the DEFAULT_ADMIN_ROLE ', async () => {
+      const DEFAULT_ADMIN_ROLE = await ANFTInstance.DEFAULT_ADMIN_ROLE();
+      // expect(await ANFTInstance.owner()).to.equal(deployer.address);
+      expect(await ANFTInstance.hasRole(DEFAULT_ADMIN_ROLE, deployer.address)).to.be.true;
     });
     it('Token has 18 decimals', async () => {
       expect(await ANFTInstance.decimals()).to.equal(18);
@@ -154,14 +150,31 @@ describe('ANFT Token', () => {
       expect(_value).to.equal(tokenAmountBN(listingValue));
       expect(_listingAddress).to.equal(address);
     });
-    it('Only deployer is able to create listing', async () => {
-      const createListingTx = ANFTInstance.connect(stakingAddr).createListing(
+
+    it('Only deployer or authorized validator is able to create listing', async () => {
+
+      const firstTx = ANFTInstance.connect(validator).createListing(
         listingOwner.address,
         tokenAmountBN(listingValue),
         minimumStakingPeriod,
         listingAPY1
       );
-      await expect(createListingTx).to.be.revertedWith('Ownable: caller is not the owner');
+
+      await expect(firstTx).to.be.revertedWith('Unauthorized');
+
+      const validatorRole = await ANFTInstance.VALIDATOR_ROLE();
+
+      await ANFTInstance.connect(deployer).grantRole(validatorRole, validator.address);
+
+      const secondTx = ANFTInstance.connect(validator).createListing(
+        listingOwner.address,
+        tokenAmountBN(listingValue),
+        minimumStakingPeriod,
+        listingAPY1
+      );
+
+      await expect(secondTx).to.emit(ANFTInstance, 'ListingCreated');
+
     });
 
     it('Listing validator is the token deployer', async () => {
@@ -197,6 +210,18 @@ describe('ANFT Token', () => {
       );
     });
 
+    it('Validator can and only validator can update validator state', async () => {
+      expect(await listingInstance.validator()).equals(deployer.address);
+
+      await listingInstance.connect(deployer).updateValidator(validator.address);
+
+      await expect(listingInstance.connect(deployer).updateValidator(validator.address)).to.be.revertedWith("Unauthorized");
+
+      await listingInstance.connect(validator).updateValidator(validator2.address);
+
+      expect(await listingInstance.validator()).equals(validator2.address);
+    })
+
     it('Owner can extend ownership of a listing', async () => {
       const initAmount = tokenAmountBN(10_000);
       await ANFTInstance.connect(deployer).transfer(stakeholder1.address, initAmount);
@@ -223,10 +248,21 @@ describe('ANFT Token', () => {
     });
 
     it('Ownership Extension can only be triggered by calling extendListingOwnership from token contract', async () => {
-      await expect(listingInstance.connect(stakeholder1).extendOwnership(tokenAmountBN(10_000))).to.be.revertedWith("Unauthorized!");
+      await expect(listingInstance.connect(stakeholder1).extendOwnership(tokenAmountBN(10_000))).to.be.revertedWith(
+        'Unauthorized!'
+      );
     });
   });
 
+  describe('Access Control', () => {
+    it('Deployer has 2 roles: VALIDATOR and DEFAULT_ADMIN_ROLE', async () => {
+      const VALIDATOR = await ANFTInstance.VALIDATOR_ROLE();
+      const DEFAULT_ADMIN_ROLE = await ANFTInstance.DEFAULT_ADMIN_ROLE();
+      expect(await ANFTInstance.hasRole(VALIDATOR, deployer.address)).to.be.true;
+      expect(await ANFTInstance.hasRole(DEFAULT_ADMIN_ROLE, deployer.address)).to.be.true;
+    });
+  })
+  
   describe('Staking', function () {
     let listingAddress1: string;
     let listingAddress2: string;
@@ -345,7 +381,7 @@ describe('ANFT Token', () => {
           listingAddress1,
           getCurrentTS() + minimumStakingPeriod - 1
         )
-      ).revertedWith('ANFTToken: Choose a longer staking period');
+      ).revertedWith('Invalid staking period');
 
       const SH1Balance_2 = await ANFTInstance.balanceOf(stakeholder1.address);
       const StakingAddress_2 = await ANFTInstance.balanceOf(stakingAddr.address);

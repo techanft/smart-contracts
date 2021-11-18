@@ -35,6 +35,10 @@ contract Listing {
         retentionRate = _retentionRate;
     }
     
+    function updateValidator (address _validator) public onlyValidator {
+        validator = _validator;
+    }
+    
     function extendOwnership(uint256 _transferedAmount) public onlyTokenContract {
         uint tokenToPayDaily = value.mul(retentionRate).div(100);
         uint creditInDays = _transferedAmount.div(tokenToPayDaily);

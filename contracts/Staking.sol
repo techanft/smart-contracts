@@ -71,7 +71,7 @@ contract Staking {
     }
     
     
-    function _claimReward(uint256 _stakingIndex) internal virtual returns(uint256) {
+    function _calculateTotalReturn(uint256 _stakingIndex) internal virtual returns(uint256) {
         StakingModel storage stakingRecord = stakings[_stakingIndex];
         
         require(stakingRecord._stakeholder == msg.sender, "Staking: Unauthorized!");

@@ -12,14 +12,18 @@ contract ListingState {
     uint256 public ownership;
     uint256 public value;
     uint256 public dailyPayment;
+
     struct OptionModel {
         uint256 _totalStake;
         uint256 _reward;
+        bool _isSet;
     }
     mapping (uint => OptionModel) public options;
 
     function setupOptionReward (uint256 _optionId, uint256 _reward) public onlyValidator {
+        require(_reward <= 100, "Listing: Invalid reward value");
         options[_optionId]._reward = _reward;
+        options[_optionId]._isSet = true;
     }   
     
     function updateOwner (address _newOwner) public onlyValidator {
@@ -50,13 +54,20 @@ contract ListingV2 is ListingState {
 
     using SafeMath for uint;
 
+    // struct StakingModel {
+    //     uint256 _optionId;
+    //     uint256 _start;
+    //     uint256 _amount;
+    //     bool _active;
+    // }
+    // mapping (address => StakingModel) public stakings;
+
     struct StakingModel {
-        uint256 _optionId;
         uint256 _start;
         uint256 _amount;
         bool _active;
     }
-    mapping (address => StakingModel) public stakings;
+    mapping (uint256 => mapping (address => StakingModel)) public stakings;
 
     uint256 public rewardPool;
 
@@ -68,7 +79,6 @@ contract ListingV2 is ListingState {
         ownership = block.timestamp;
         tokenContract = msg.sender;
     }
-
  
     event OwnershipExtension (address _prevOwner, address _newOwner, uint256 _start, uint256 _end, uint256 _amount);
 
@@ -110,62 +120,86 @@ contract ListingV2 is ListingState {
         ownership = block.timestamp;
     }
 
-    function calculateStakeholderReward (address _stakeholder) private view returns (uint256) {
-        uint256 T = totalStake.div(value).mul(100);
+    // function calculateStakeholderReward (address _stakeholder) private view returns (uint256) {
+    function calculateStakeholderReward (uint256 _optionId, StakingModel storage _userStake) private view returns (uint256) {
+        uint256 T = totalStake.mul(100).div(value);
+    // console.log("totalStake.div(value): '%s'", totalStake.mul(100).div(value));
+    // console.log("totalStake: '%s'", totalStake);
+    // console.log("value: '%s'", value);
+    // console.log("T: '%s'", T);
 
         uint256 RTd = dailyPayment.mul(T).div(100);
+        // console.log("RTd: '%s'", RTd);
 
-        StakingModel memory userStake = stakings[_stakeholder];
-        OptionModel memory optionInfo = options[userStake._optionId];
+        OptionModel memory optionInfo = options[_optionId];
 
-        uint256 Ar = (RTd.mul(optionInfo._reward).div(100)).div(optionInfo._totalStake).mul(userStake._amount);
+        uint256 Ar = (RTd.mul(optionInfo._reward).div(100)).mul(_userStake._amount).div(optionInfo._totalStake);
+        // console.log("Ar: '%s'", Ar);
 
-        uint256 stakedDays = (block.timestamp - userStake._start) / 86400;
+        uint256 stakedDays = (block.timestamp - _userStake._start) / 86400;
+        // console.log("StakedDays: '%s'", stakedDays);
 
-        uint payoutAmount = Ar.mul(stakedDays);
+        uint amountToReturn = Ar.mul(stakedDays);
+        // console.log("amountToReturn: '%s'", amountToReturn);
 
-        return payoutAmount;
+        return amountToReturn;
     }
 
     event Claim(address _stakeholder, uint256 _reward, uint256 _from, uint256 _to);
     
-    function claimReward () public {
-        require(stakings[msg.sender]._active, "Listing: Register first!");
-        uint256 callerBalance = ANFTV2(tokenContract).balanceOf(msg.sender);
-        require(callerBalance >= stakings[msg.sender]._amount, "Listing: Insufficient balance");
+    function claimReward (uint256 _optionId) public {
+        StakingModel storage userStake = stakings[_optionId][msg.sender];
 
-        uint256 payoutAmount = calculateStakeholderReward(msg.sender);
+        require(userStake._active, "Listing: Register first!");
+        uint256 callerBalance = ANFTV2(tokenContract).balanceOf(msg.sender);
+        require(callerBalance >= userStake._amount, "Listing: Insufficient balance!");
+
+        // uint256 payoutAmount = calculateStakeholderReward(msg.sender);
+        uint256 payoutAmount = calculateStakeholderReward(_optionId, userStake);
+
+        // console.log("payoutAmount: '%s'", payoutAmount);
+
         ANFTV2(tokenContract).handleListingTx(msg.sender, payoutAmount, false);
 
-        emit Claim(msg.sender, payoutAmount, stakings[msg.sender]._start, block.timestamp);  
+        emit Claim(msg.sender, payoutAmount, userStake._start, block.timestamp);  
 
-        stakings[msg.sender]._start = block.timestamp;
+        userStake._start = block.timestamp;
         rewardPool = rewardPool.sub(payoutAmount);              
     }
 
     event Register(address _stakeholder, uint256 _amount, uint256 _optionId, uint256 _start);
     
     function register (uint256 _amount, uint256 _optionId) public {
-        stakings[msg.sender]._start = block.timestamp;
-        stakings[msg.sender]._amount = _amount;
-        stakings[msg.sender]._active = true;
-        stakings[msg.sender]._optionId = _optionId;
+        require(options[_optionId]._isSet, "Listing: Option not available");
+
+        StakingModel storage userStake = stakings[_optionId][msg.sender];
+
+        userStake._start = block.timestamp;
+        userStake._amount = userStake._amount.add(_amount);
+        userStake._active = true;
+
         options[_optionId]._totalStake = options[_optionId]._totalStake.add(_amount);
 
+        totalStake = totalStake.add(_amount);
+
         emit Register(msg.sender, _amount, _optionId, block.timestamp);
-        // Call token contract
     }
 
 
     event Unregister(address _stakeholder, uint _at);
 
-    function unregister() public {
-        StakingModel storage userStake = stakings[msg.sender];
+    function unregister(uint256 _optionId) public {
+        StakingModel storage userStake = stakings[_optionId][msg.sender];
 
         require(userStake._active, "Listing: Register first!");
-        userStake._active = false;
 
-        options[userStake._optionId]._totalStake = options[userStake._optionId]._totalStake.sub(userStake._amount);
+        options[_optionId]._totalStake = options[_optionId]._totalStake.sub(userStake._amount);
+
+        totalStake = totalStake.sub(userStake._amount);
+
+        userStake._amount = 0;
+        userStake._active = false;
+        userStake._start = 0;
 
         emit Unregister(msg.sender, block.timestamp);
     }

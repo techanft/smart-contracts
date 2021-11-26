@@ -62,14 +62,6 @@ contract ListingV2 is ListingState {
 
     using SafeMath for uint;
 
-    // struct StakingModel {
-    //     uint256 _optionId;
-    //     uint256 _start;
-    //     uint256 _amount;
-    //     bool _active;
-    // }
-    // mapping (address => StakingModel) public stakings;
-
     struct StakingModel {
         uint256 _start;
         uint256 _amount;
@@ -130,6 +122,14 @@ contract ListingV2 is ListingState {
 
     function calculateStakeholderReward (uint256 _optionId, StakingModel storage _userStake) private view returns (uint256) {
         uint256 T = totalStake.mul(100).div(value);
+
+        if (T > 86) {
+            T = 86;
+        }
+
+        if (block.timestamp > ownership && T > 50) {
+            T = 50;
+        }
 
         uint256 RTd = dailyPayment.mul(T).div(100);
 

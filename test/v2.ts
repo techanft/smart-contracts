@@ -93,13 +93,14 @@ export const v2 = () => {
       stakeholder2: SignerWithAddress,
       listingOwner1: SignerWithAddress,
       listingOwner2: SignerWithAddress,
-      validator: SignerWithAddress;
+      validator: SignerWithAddress,
+      validator2: SignerWithAddress;
     let ANFTFactory: ANFTV2__factory;
     let ANFTInstance: ANFTV2;
     let ANFTAddress: string;
 
     beforeEach(async () => {
-      [deployer, stakingAcc, stakeholder1, stakeholder2, validator, listingOwner1, listingOwner2] =
+      [deployer, stakingAcc, stakeholder1, stakeholder2, validator, validator2, listingOwner1, listingOwner2] =
         await ethers.getSigners();
       ANFTFactory = await ethers.getContractFactory('ANFTV2');
       ANFTInstance = await ANFTFactory.connect(deployer).deploy(stakingAcc.address);
@@ -177,6 +178,13 @@ export const v2 = () => {
         await expect(ANFTInstance.connect(validator).createListing(stakeholder1.address)).to.be.not.reverted;
       });
 
+      it('Only created Listing can call handleListingTx in token contract', async () => {
+        const amount = tokenAmountBN(1_000);
+        await expect(
+          ANFTInstance.connect(deployer).handleListingTx(deployer.address, amount, false)
+        ).to.be.revertedWith('ANFTV2: Invalid Listing');
+      });
+
       it('New listing at deployed address has correct config: Owner, Validator, tokenContract', async () => {
         expect(await listingInstance.validator()).to.equal(validator.address);
         expect(await listingInstance.owner()).to.equal(listingOwner1.address);
@@ -184,31 +192,61 @@ export const v2 = () => {
       });
 
       it('Listing initial status is active', async () => {
+        expect((await ANFTInstance.listingStatus(listingAddress))._isCreated).to.be.true;
         expect((await ANFTInstance.listingStatus(listingAddress))._active).to.be.true;
       });
 
       it('VALIDATOR and only VALIDATOR role can toggle listing status', async () => {
-          const listingStatus_1 = await ANFTInstance.listingStatus(listingAddress);
+        const listingStatus_1 = await ANFTInstance.listingStatus(listingAddress);
 
-          await expect(ANFTInstance.connect(stakeholder1).toggleListingStatus(listingAddress)).to.be.revertedWith("ANFTV2: Unauthorized");
-          await expect(ANFTInstance.connect(validator).toggleListingStatus(stakeholder1.address)).to.be.revertedWith("ANFTV2: Invalid Listing");
+        await expect(ANFTInstance.connect(stakeholder1).toggleListingStatus(listingAddress)).to.be.revertedWith(
+          'ANFTV2: Unauthorized'
+        );
+        await expect(ANFTInstance.connect(validator).toggleListingStatus(stakeholder1.address)).to.be.revertedWith(
+          'ANFTV2: Invalid Listing'
+        );
 
-          const listingStatus_2 = await ANFTInstance.listingStatus(listingAddress);
+        const listingStatus_2 = await ANFTInstance.listingStatus(listingAddress);
 
-          expect(listingStatus_1._active).equal(listingStatus_2._active)
-          
-          await expect(ANFTInstance.connect(validator).toggleListingStatus(listingAddress)).to.be.not.reverted;
-          
-          const listingStatus_3 = await ANFTInstance.listingStatus(listingAddress);
+        expect(listingStatus_1._active).equal(listingStatus_2._active);
 
-          expect(!listingStatus_3._active);
+        await expect(ANFTInstance.connect(validator).toggleListingStatus(listingAddress)).to.be.not.reverted;
 
-          
+        const listingStatus_3 = await ANFTInstance.listingStatus(listingAddress);
 
-      })
+        expect(!listingStatus_3._active);
+      });
+
       it('Listing initial ownership is equals to block.timestamp', async () => {
         const creationBlockTimeStamp = (await ethers.provider.getBlock(listingCreationBlock)).timestamp;
         expect(await listingInstance.ownership()).to.equal(creationBlockTimeStamp);
+      });
+
+      it('Validator can replace himself', async () => {
+        const listingValue_1 = await listingInstance.value();
+        const newListingValue = tokenAmountBN(1_000_000);
+
+        const listingValidator_1 = await listingInstance.validator();
+        expect(listingValidator_1).equal(validator.address);
+        expect(listingValidator_1).not.equal(validator2.address);
+
+        await expect(listingInstance.connect(validator2).updateValue(newListingValue)).to.be.revertedWith(
+          'Listing: Unauth!'
+        );
+        await expect(listingInstance.connect(validator2).updateValidator(validator2.address)).to.be.revertedWith(
+          'Listing: Unauth!'
+        );
+        const listingValue_2 = await listingInstance.value();
+        expect(listingValue_2).equal(listingValue_1);
+
+        await expect(listingInstance.connect(validator).updateValidator(validator2.address)).to.be.not.reverted;
+
+        const listingValidator_2 = await listingInstance.validator();
+        expect(listingValidator_2).equal(validator2.address);
+        await expect(listingInstance.connect(validator2).updateValue(newListingValue)).to.be.not.reverted;
+
+        const listingValue_3 = await listingInstance.value();
+        expect(listingValue_3).equal(newListingValue);
       });
 
       it('Validator and only validator can set these config for listing: Owner, Option Reward, Value, Daily Payment', async () => {
@@ -240,6 +278,7 @@ export const v2 = () => {
 
         expect(firstOption_1._reward).equal(firstOption_2._reward);
         expect(firstOption_2._reward).not.equal(firstOptionRward);
+        expect(!firstOption_2._isSet);
 
         expect(owner_1).equal(owner_2);
         expect(owner_1).not.equal(newOwner);
@@ -267,6 +306,7 @@ export const v2 = () => {
         expect(owner_3).equal(newOwner);
         expect(value_3).equal(newListingValue);
         expect(daiyPayment_3).equal(newDailyPayment);
+        expect(firstOption_3._isSet);
       });
 
       it('Listing Creation event is created with correct arguments', async () => {
@@ -290,7 +330,6 @@ export const v2 = () => {
           const SABal_1 = await ANFTInstance.balanceOf(stakingAcc.address);
 
           const rewardPool_1 = await listingInstance.rewardPool();
-
           const initialOwnership = await listingInstance.ownership();
 
           const extendOwnershipTx = await listingInstance.connect(listingOwner1).extendOwnership(extensionValues);
@@ -316,6 +355,29 @@ export const v2 = () => {
           const actualOwnership = (await listingInstance.ownership()).toNumber();
 
           expect(_end).equal(actualOwnership);
+        });
+
+        it('Owner cant extend ownership with inactive listing', async () => {
+          const ownerBal_1 = await ANFTInstance.balanceOf(listingOwner1.address);
+          const SABal_1 = await ANFTInstance.balanceOf(stakingAcc.address);
+          const rewardPool_1 = await listingInstance.rewardPool();
+          const ownershipValue_1 = await listingInstance.ownership();
+
+          await ANFTInstance.connect(validator).toggleListingStatus(listingAddress);
+
+          await expect(listingInstance.connect(listingOwner1).extendOwnership(extensionValues)).to.be.revertedWith(
+            'ANFTV2: Inactive Listing'
+          );
+
+          const ownerBal_2 = await ANFTInstance.balanceOf(listingOwner1.address);
+          const SABal_2 = await ANFTInstance.balanceOf(stakingAcc.address);
+          const rewardPool_2 = await listingInstance.rewardPool();
+          const ownershipValue_2 = await listingInstance.ownership();
+
+          expect(ownerBal_1).equal(ownerBal_2);
+          expect(SABal_1).equal(SABal_2);
+          expect(rewardPool_1).equal(rewardPool_2);
+          expect(ownershipValue_1).equal(ownershipValue_2);
         });
 
         it('An OwnershipExtension event is omitted when user extends ownership', async () => {
@@ -435,6 +497,18 @@ export const v2 = () => {
           expect(listingOwner_2).equal(listingOwner_1);
           expect(listingOwner_2).not.equal(listingOwner2.address);
         });
+
+        it("If the current ownership doesnt forfeit, the validator can't change the owner", async () => {
+          await listingInstance.connect(listingOwner1).extendOwnership(extensionValues);
+          const listingOwner_1 = await listingInstance.owner();
+
+          await expect(listingInstance.connect(validator).updateOwner(listingOwner2.address)).to.be.revertedWith(
+            'Current owner is still legit'
+          );
+
+          const listingOwner_2 = await listingInstance.owner();
+          expect(listingOwner_2).equal(listingOwner_1);
+        });
       });
 
       describe('Ownership withdrawal', () => {
@@ -523,6 +597,28 @@ export const v2 = () => {
 
           expect(rewardPool_2.sub(expectedTokensToReturn)).equal(rewardPool_3);
         });
+
+        it('Owner cant withdraw with inactive listing', async () => {
+          await listingInstance.connect(listingOwner1).extendOwnership(extensionValues);
+          const rewardPool_1 = await listingInstance.rewardPool();
+          const ownership_1 = await listingInstance.ownership();
+
+          await ANFTInstance.connect(deployer).toggleListingStatus(listingAddress);
+
+          await expect(listingInstance.connect(listingOwner1).extendOwnership(extensionValues)).to.be.revertedWith(
+            'ANFTV2: Inactive Listing'
+          );
+
+          await expect(listingInstance.connect(listingOwner1).withdraw()).to.be.revertedWith(
+            'ANFTV2: Inactive Listing'
+          );
+
+          const rewardPool_2 = await listingInstance.rewardPool();
+          const ownership_2 = await listingInstance.ownership();
+
+          expect(rewardPool_1).equal(rewardPool_2);
+          expect(ownership_1).equal(ownership_2);
+        });
       });
 
       describe('Users register for staking', () => {
@@ -550,6 +646,15 @@ export const v2 = () => {
           await expect(
             listingInstance.connect(validator).setupOptionReward(optionId, maximumReward + 1)
           ).to.be.revertedWith('Listing: Invalid reward value');
+        });
+
+        it('User cant register for options which arent setup by validator', async () => {
+          const randomOption = 6;
+
+          await expect(
+            listingInstance.connect(stakeholder1).register(registeredAmount, randomOption)
+          ).to.be.revertedWith('Listing: Option not available');
+          await expect(listingInstance.connect(stakeholder1).register(registeredAmount, option0)).to.be.not.reverted;
         });
 
         it('Staking info is recorded when user register', async () => {
@@ -618,6 +723,16 @@ export const v2 = () => {
           const { _totalStake: poolStake_3 } = await listingInstance.options(option0);
           expect(poolStake_2.add(registeredAmount.mul(2))).equal(poolStake_3);
         });
+
+        it('User cant register for inactive listing', async () => {
+          await expect(listingInstance.connect(stakeholder1).register(registeredAmount, option0)).to.be.not.reverted;
+
+          await ANFTInstance.connect(validator).toggleListingStatus(listingAddress);
+
+          await expect(listingInstance.connect(stakeholder2).register(registeredAmount, option0)).to.be.revertedWith(
+            'Listing: Inactive listing!'
+          );
+        });
       });
 
       describe('User unregister for staking', () => {
@@ -648,6 +763,14 @@ export const v2 = () => {
           expect(!stakingInfo_2._active);
           expect(stakingInfo_2._amount).to.equal(0);
           expect(stakingInfo_2._start).to.equal(0);
+        });
+
+        it('User cant unregister with inactive listing', async () => {
+          await ANFTInstance.connect(validator).toggleListingStatus(listingAddress);
+
+          await expect(listingInstance.connect(stakeholder1).unregister(option0)).to.be.revertedWith(
+            'Listing: Inactive listing!'
+          );
         });
 
         it("Option's total stake is updated", async () => {
@@ -721,6 +844,26 @@ export const v2 = () => {
           expect(SHBal_2).equal(SHBal_1.add(expectedReward));
         });
 
+        it('User cant claim reward with inactive listing', async () => {
+          const SABal_1 = await ANFTInstance.balanceOf(stakingAcc.address);
+          const SHBal_1 = await ANFTInstance.balanceOf(stakeholder1.address);
+          const rewardPool_1 = await listingInstance.rewardPool();
+
+          await ANFTInstance.connect(validator).toggleListingStatus(listingAddress);
+
+          await expect(listingInstance.connect(stakeholder1).claimReward(option0)).to.be.revertedWith(
+            'ANFTV2: Inactive Listing'
+          );
+
+          const SABal_2 = await ANFTInstance.balanceOf(stakingAcc.address);
+          const SHBal_2 = await ANFTInstance.balanceOf(stakeholder1.address);
+          const rewardPool_2 = await listingInstance.rewardPool();
+
+          expect(SABal_1).equal(SABal_2);
+          expect(SHBal_1).equal(SHBal_2);
+          expect(rewardPool_1).equal(rewardPool_2);
+        });
+
         it('Stakeholder balance must have at least registered amount to claim reward', async () => {
           const SHBal_1 = await ANFTInstance.balanceOf(stakeholder1.address);
           const userStake = await listingInstance.stakings(option0, stakeholder1.address);
@@ -773,7 +916,6 @@ export const v2 = () => {
         });
 
         it('A Claim event is emitted', async () => {
-
           const claimTx = listingInstance.connect(stakeholder1).claimReward(option0);
           await expect(claimTx).to.emit(listingInstance, 'Claim');
           const claimReceipt = await (await claimTx).wait();

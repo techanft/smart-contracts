@@ -47,6 +47,14 @@ contract ListingState {
         require(msg.sender == validator, "Listing: Unauth!");
         _;
     }
+
+    modifier onlyActiveListing() {
+        (, bool _active) = ANFTV2(tokenContract).listingStatus(address(this));
+
+        // console.log("_active '%s'", _active);
+        require(_active, "Listing: Inactive listing!");
+        _;
+    }
     
 }
 
@@ -120,27 +128,18 @@ contract ListingV2 is ListingState {
         ownership = block.timestamp;
     }
 
-    // function calculateStakeholderReward (address _stakeholder) private view returns (uint256) {
     function calculateStakeholderReward (uint256 _optionId, StakingModel storage _userStake) private view returns (uint256) {
         uint256 T = totalStake.mul(100).div(value);
-    // console.log("totalStake.div(value): '%s'", totalStake.mul(100).div(value));
-    // console.log("totalStake: '%s'", totalStake);
-    // console.log("value: '%s'", value);
-    // console.log("T: '%s'", T);
 
         uint256 RTd = dailyPayment.mul(T).div(100);
-        // console.log("RTd: '%s'", RTd);
 
         OptionModel memory optionInfo = options[_optionId];
 
         uint256 Ar = (RTd.mul(optionInfo._reward).div(100)).mul(_userStake._amount).div(optionInfo._totalStake);
-        // console.log("Ar: '%s'", Ar);
 
         uint256 stakedDays = (block.timestamp - _userStake._start) / 86400;
-        // console.log("StakedDays: '%s'", stakedDays);
 
         uint amountToReturn = Ar.mul(stakedDays);
-        // console.log("amountToReturn: '%s'", amountToReturn);
 
         return amountToReturn;
     }
@@ -154,10 +153,7 @@ contract ListingV2 is ListingState {
         uint256 callerBalance = ANFTV2(tokenContract).balanceOf(msg.sender);
         require(callerBalance >= userStake._amount, "Listing: Insufficient balance!");
 
-        // uint256 payoutAmount = calculateStakeholderReward(msg.sender);
         uint256 payoutAmount = calculateStakeholderReward(_optionId, userStake);
-
-        // console.log("payoutAmount: '%s'", payoutAmount);
 
         ANFTV2(tokenContract).handleListingTx(msg.sender, payoutAmount, false);
 
@@ -169,7 +165,7 @@ contract ListingV2 is ListingState {
 
     event Register(address _stakeholder, uint256 _amount, uint256 _optionId, uint256 _start);
     
-    function register (uint256 _amount, uint256 _optionId) public {
+    function register (uint256 _amount, uint256 _optionId) public onlyActiveListing {
         require(options[_optionId]._isSet, "Listing: Option not available");
 
         StakingModel storage userStake = stakings[_optionId][msg.sender];
@@ -188,7 +184,7 @@ contract ListingV2 is ListingState {
 
     event Unregister(address _stakeholder, uint _at);
 
-    function unregister(uint256 _optionId) public {
+    function unregister(uint256 _optionId) public onlyActiveListing {
         StakingModel storage userStake = stakings[_optionId][msg.sender];
 
         require(userStake._active, "Listing: Register first!");

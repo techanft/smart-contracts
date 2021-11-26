@@ -10,7 +10,6 @@ import "hardhat/console.sol";
 
 contract ANFTV2 is ERC20, AccessControl {
     
-    // event ListingCreated(address _validator, address _owner, uint256 _value, address _listingAddress);
     event ListingCreation(address _validator, address _owner, address _listingAddress);
 
     bytes32 public constant VALIDATOR = keccak256("VALIDATOR");
@@ -51,6 +50,7 @@ contract ANFTV2 is ERC20, AccessControl {
 
     function toggleListingStatus (address _listingAddr) public {
         require(hasRole(VALIDATOR, msg.sender), "ANFTV2: Unauthorized");
+        require(listingStatus[_listingAddr]._isCreated, "ANFTV2: Invalid Listing");
         listingStatus[_listingAddr]._active = !listingStatus[_listingAddr]._active;
     }
 

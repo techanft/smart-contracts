@@ -12,6 +12,7 @@ contract ListingState {
     uint256 public ownership;
     uint256 public value;
     uint256 public dailyPayment;
+    mapping (address => bool) public workers;
 
     struct OptionModel {
         uint256 _totalStake;
@@ -200,6 +201,12 @@ contract ListingV2 is ListingState {
         emit Unregister(msg.sender, block.timestamp);
     }
 
+    event UpdateWorker(address _worker, bool _isAuthorized);
+    function updateWorker(address _worker) public {
+        require(msg.sender == owner, "Listing: Unauth!");
+        workers[_worker] = !workers[_worker];
+        emit UpdateWorker(_worker, workers[_worker]);
+    }
 
 
 

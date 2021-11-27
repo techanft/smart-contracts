@@ -106,6 +106,8 @@ export const v2 = () => {
       stakeholder2: SignerWithAddress,
       listingOwner1: SignerWithAddress,
       listingOwner2: SignerWithAddress,
+      worker1: SignerWithAddress,
+      worker2: SignerWithAddress,
       validator: SignerWithAddress,
       validator2: SignerWithAddress;
     let ANFTFactory: ANFTV2__factory;
@@ -113,8 +115,18 @@ export const v2 = () => {
     let ANFTAddress: string;
 
     beforeEach(async () => {
-      [deployer, stakingAcc, stakeholder1, stakeholder2, validator, validator2, listingOwner1, listingOwner2] =
-        await ethers.getSigners();
+      [
+        deployer,
+        stakingAcc,
+        stakeholder1,
+        stakeholder2,
+        validator,
+        validator2,
+        listingOwner1,
+        listingOwner2,
+        worker1,
+        worker2,
+      ] = await ethers.getSigners();
       ANFTFactory = await ethers.getContractFactory('ANFTV2');
       ANFTInstance = await ANFTFactory.connect(deployer).deploy(stakingAcc.address);
       const deployedData = await ANFTInstance.deployed();
@@ -189,6 +201,34 @@ export const v2 = () => {
           'ANFTV2: Unauthorized'
         );
         await expect(ANFTInstance.connect(validator).createListing(stakeholder1.address)).to.be.not.reverted;
+      });
+
+      it('Owner and only owner is able to update worker state', async () => {
+        const workerStatus_1 = await listingInstance.workers(worker1.address);        
+        expect(!workerStatus_1);
+        await expect(listingInstance.connect(validator).updateWorker(worker1.address)).to.be.revertedWith(
+          'Listing: Unauth!'
+        );
+        await expect(listingInstance.connect(stakeholder1).updateWorker(worker1.address)).to.be.revertedWith(
+          'Listing: Unauth!'
+        );
+        await expect(listingInstance.connect(listingOwner1).updateWorker(worker1.address)).to.be.not.reverted;
+        const workerStatus_2 = await listingInstance.workers(worker1.address);
+        expect(workerStatus_2);
+      });
+
+      it('An UpdateWorker event is emitted with correct arguments', async () => {
+        const workerStatus_1 = await listingInstance.workers(worker1.address);
+
+        await expect(listingInstance.connect(listingOwner1).updateWorker(worker1.address)).to.emit(
+          listingInstance,
+          'UpdateWorker'
+        ).withArgs(worker1.address, !workerStatus_1);
+
+        await expect(listingInstance.connect(listingOwner1).updateWorker(worker1.address)).to.emit(
+          listingInstance,
+          'UpdateWorker'
+        ).withArgs(worker1.address, !!workerStatus_1);
       });
 
       it('Only created Listing can call handleListingTx in token contract', async () => {
@@ -858,90 +898,88 @@ export const v2 = () => {
         });
 
         it('Maximum T is 86% for unforfeited listing', async () => {
-            const listingValue_1 = await listingInstance.value();
-            const totalStake_1 = await listingInstance.totalStake();
+          const listingValue_1 = await listingInstance.value();
+          const totalStake_1 = await listingInstance.totalStake();
 
-            // Ensure total stake is equal to listing instance
-            await listingInstance.connect(stakeholder1).register(listingValue_1.sub(totalStake_1), option0);
+          // Ensure total stake is equal to listing instance
+          await listingInstance.connect(stakeholder1).register(listingValue_1.sub(totalStake_1), option0);
 
-            await ethers.provider.send('evm_increaseTime', [86400 * 2]);
-            await ethers.provider.send('evm_mine', []);
-            const { _start: stakeStart } = await listingInstance.stakings(option0, stakeholder1.address);
+          await ethers.provider.send('evm_increaseTime', [86400 * 2]);
+          await ethers.provider.send('evm_mine', []);
+          const { _start: stakeStart } = await listingInstance.stakings(option0, stakeholder1.address);
 
-            const listingValue_2 = await listingInstance.value();
-            const totalStake_2 = await listingInstance.totalStake();
+          const listingValue_2 = await listingInstance.value();
+          const totalStake_2 = await listingInstance.totalStake();
 
-            expect(listingValue_2).equal(totalStake_2);
+          expect(listingValue_2).equal(totalStake_2);
 
-            const SABal_1 = await ANFTInstance.balanceOf(stakingAcc.address);
-            const SHBal_1 = await ANFTInstance.balanceOf(stakeholder1.address);
-  
-            const claimTx = await listingInstance.connect(stakeholder1).claimReward(option0);
-            const claimReceipt = await claimTx.wait();
-            const claimTS = (await ethers.provider.getBlock(claimReceipt.blockNumber)).timestamp;
-  
-            const expectedReward = await calculateStakeHolderReward({
-              stakeStart,
-              instance: listingInstance,
-              optionId: option0,
-              stakeholder: stakeholder1.address,
-              blockTS: BigNumber.from(claimTS),
-            });
+          const SABal_1 = await ANFTInstance.balanceOf(stakingAcc.address);
+          const SHBal_1 = await ANFTInstance.balanceOf(stakeholder1.address);
 
-            const SABal_2 = await ANFTInstance.balanceOf(stakingAcc.address);
-            const SHBal_2 = await ANFTInstance.balanceOf(stakeholder1.address);
-  
-            expect(SABal_2).equal(SABal_1.sub(expectedReward));
-            expect(SHBal_2).equal(SHBal_1.add(expectedReward));
-        })
+          const claimTx = await listingInstance.connect(stakeholder1).claimReward(option0);
+          const claimReceipt = await claimTx.wait();
+          const claimTS = (await ethers.provider.getBlock(claimReceipt.blockNumber)).timestamp;
+
+          const expectedReward = await calculateStakeHolderReward({
+            stakeStart,
+            instance: listingInstance,
+            optionId: option0,
+            stakeholder: stakeholder1.address,
+            blockTS: BigNumber.from(claimTS),
+          });
+
+          const SABal_2 = await ANFTInstance.balanceOf(stakingAcc.address);
+          const SHBal_2 = await ANFTInstance.balanceOf(stakeholder1.address);
+
+          expect(SABal_2).equal(SABal_1.sub(expectedReward));
+          expect(SHBal_2).equal(SHBal_1.add(expectedReward));
+        });
 
         it('Maximum T is 50% for forfeited listing', async () => {
-            const listingValue_1 = await listingInstance.value();
-            const totalStake_1 = await listingInstance.totalStake();
+          const listingValue_1 = await listingInstance.value();
+          const totalStake_1 = await listingInstance.totalStake();
 
-            // Ensure total stake is equal to listing instance
-            await listingInstance.connect(stakeholder2).register(listingValue_1.sub(totalStake_1), option0);
+          // Ensure total stake is equal to listing instance
+          await listingInstance.connect(stakeholder2).register(listingValue_1.sub(totalStake_1), option0);
 
+          const initialListingTS = await listingInstance.ownership();
 
-            const initialListingTS = await listingInstance.ownership();
+          const blockNumBefore = await ethers.provider.getBlockNumber();
+          const blockBefore = await ethers.provider.getBlock(blockNumBefore);
+          const timestampBefore = blockBefore.timestamp;
 
-            const blockNumBefore = await ethers.provider.getBlockNumber();
-            const blockBefore = await ethers.provider.getBlock(blockNumBefore);
-            const timestampBefore = blockBefore.timestamp;
+          expect(initialListingTS.toNumber() > timestampBefore);
 
-            expect(initialListingTS.toNumber() > timestampBefore);
+          const timeToIncrease = initialListingTS.toNumber() - timestampBefore;
+          await ethers.provider.send('evm_increaseTime', [timeToIncrease + 1]);
 
-            const timeToIncrease = initialListingTS.toNumber() - timestampBefore;
-            await ethers.provider.send('evm_increaseTime', [timeToIncrease + 1]);
+          const blockNumAfter = await ethers.provider.getBlockNumber();
+          const blockAfter = await ethers.provider.getBlock(blockNumAfter);
+          const timestampAfter = blockAfter.timestamp;
 
-            const blockNumAfter = await ethers.provider.getBlockNumber();
-            const blockAfter = await ethers.provider.getBlock(blockNumAfter);
-            const timestampAfter = blockAfter.timestamp;
+          expect(initialListingTS.toNumber() < timestampAfter);
 
-            expect(initialListingTS.toNumber() < timestampAfter);
+          const SABal_1 = await ANFTInstance.balanceOf(stakingAcc.address);
+          const SHBal_1 = await ANFTInstance.balanceOf(stakeholder1.address);
 
-            const SABal_1 = await ANFTInstance.balanceOf(stakingAcc.address);
-            const SHBal_1 = await ANFTInstance.balanceOf(stakeholder1.address);
-  
-            const claimTx = await listingInstance.connect(stakeholder1).claimReward(option0);
-            const claimReceipt = await claimTx.wait();
-            const claimTS = (await ethers.provider.getBlock(claimReceipt.blockNumber)).timestamp;
-  
-            const expectedReward = await calculateStakeHolderReward({
-              stakeStart,
-              instance: listingInstance,
-              optionId: option0,
-              stakeholder: stakeholder1.address,
-              blockTS: BigNumber.from(claimTS),
-            });
+          const claimTx = await listingInstance.connect(stakeholder1).claimReward(option0);
+          const claimReceipt = await claimTx.wait();
+          const claimTS = (await ethers.provider.getBlock(claimReceipt.blockNumber)).timestamp;
 
-            const SABal_2 = await ANFTInstance.balanceOf(stakingAcc.address);
-            const SHBal_2 = await ANFTInstance.balanceOf(stakeholder1.address);
-  
-            expect(SABal_2).equal(SABal_1.sub(expectedReward));
-            expect(SHBal_2).equal(SHBal_1.add(expectedReward));
+          const expectedReward = await calculateStakeHolderReward({
+            stakeStart,
+            instance: listingInstance,
+            optionId: option0,
+            stakeholder: stakeholder1.address,
+            blockTS: BigNumber.from(claimTS),
+          });
 
-        })
+          const SABal_2 = await ANFTInstance.balanceOf(stakingAcc.address);
+          const SHBal_2 = await ANFTInstance.balanceOf(stakeholder1.address);
+
+          expect(SABal_2).equal(SABal_1.sub(expectedReward));
+          expect(SHBal_2).equal(SHBal_1.add(expectedReward));
+        });
 
         it('User cant claim reward with inactive listing', async () => {
           const SABal_1 = await ANFTInstance.balanceOf(stakingAcc.address);

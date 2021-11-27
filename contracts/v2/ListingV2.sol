@@ -52,7 +52,6 @@ contract ListingState {
     modifier onlyActiveListing() {
         (, bool _active) = ANFTV2(tokenContract).listingStatus(address(this));
 
-        // console.log("_active '%s'", _active);
         require(_active, "Listing: Inactive listing!");
         _;
     }

@@ -4,7 +4,7 @@ import { expect } from 'chai';
 import { BigNumber, ContractReceipt } from 'ethers';
 import { ethers } from 'hardhat';
 import { ANFTV2__factory, ListingV2__factory, ANFTV2, ListingV2 } from '../typechain';
-import { tokenAmountBN, getCurrentTS } from './v1';
+import { tokenAmountBN } from './v1';
 
 const litingAddrFromListingCreationEvent = (events: Event[] | undefined): string => {
   const ListingCreatedEvent = events?.find(({ event }) => event == 'ListingCreation');
@@ -102,6 +102,7 @@ export const v2 = () => {
   describe('ANFT Token V2', () => {
     let deployer: SignerWithAddress,
       stakingAcc: SignerWithAddress,
+      stakingAcc2: SignerWithAddress,
       stakeholder1: SignerWithAddress,
       stakeholder2: SignerWithAddress,
       listingOwner1: SignerWithAddress,
@@ -118,6 +119,7 @@ export const v2 = () => {
       [
         deployer,
         stakingAcc,
+        stakingAcc2,
         stakeholder1,
         stakeholder2,
         validator,
@@ -202,6 +204,20 @@ export const v2 = () => {
         );
         await expect(ANFTInstance.connect(validator).createListing(stakeholder1.address)).to.be.not.reverted;
       });
+
+      it('Only account with DEFAULT_ADMIN_ROLE can set staking address', async () => {
+          const initialStakingAddress = await ANFTInstance.stakingAddress();
+          expect(initialStakingAddress).equal(stakingAcc.address);
+            
+          await expect(ANFTInstance.connect(validator).updateStakingAddress(stakingAcc2.address)).to.be.revertedWith('ANFTV2: Unauthorized');
+          
+          const DEFAULT_ADMIN_ROLE = await ANFTInstance.DEFAULT_ADMIN_ROLE();
+          await ANFTInstance.grantRole(DEFAULT_ADMIN_ROLE, validator.address);
+          await expect(ANFTInstance.connect(validator).updateStakingAddress(stakingAcc2.address)).to.be.not.reverted;
+          const newStakingAddress = await ANFTInstance.stakingAddress();
+          expect(newStakingAddress).equal(stakingAcc2.address);
+
+      })
 
       it('Owner and only owner is able to update worker state', async () => {
         const workerStatus_1 = await listingInstance.workers(worker1.address);        

@@ -12,6 +12,8 @@ contract ListingState {
     uint256 public ownership;
     uint256 public value;
     uint256 public dailyPayment;
+    uint256 public version = 1;
+
     mapping (address => bool) public workers;
 
     struct OptionModel {
@@ -42,6 +44,22 @@ contract ListingState {
     
     function updateValidator (address _validator) public onlyValidator {
         validator = _validator;
+    }
+
+    event UpdateTokenContract(address _newContract);
+
+    function updateTokenContract(address _newContract) public onlyValidator {
+        tokenContract = _newContract;
+        emit UpdateTokenContract(_newContract);
+    }
+
+    event UpdateWorker(address _worker, bool _isAuthorized);
+
+    function updateWorker(address _worker) public {
+        require(msg.sender == owner, "Listing: Unauth!");
+        require(ownership >= block.timestamp, "Listing: Ownership expired");
+        workers[_worker] = !workers[_worker];
+        emit UpdateWorker(_worker, workers[_worker]);
     }
     
     modifier onlyValidator() {
@@ -202,11 +220,4 @@ contract ListingV2 is ListingState {
         emit Unregister(msg.sender, block.timestamp);
     }
 
-    event UpdateWorker(address _worker, bool _isAuthorized);
-    function updateWorker(address _worker) public {
-        require(msg.sender == owner, "Listing: Unauth!");
-        require(ownership >= block.timestamp, "Listing: Ownership expired");
-        workers[_worker] = !workers[_worker];
-        emit UpdateWorker(_worker, workers[_worker]);
-    }
 }

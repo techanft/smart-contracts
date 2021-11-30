@@ -209,8 +209,4 @@ contract ListingV2 is ListingState {
         workers[_worker] = !workers[_worker];
         emit UpdateWorker(_worker, workers[_worker]);
     }
-
-
-
-
 }

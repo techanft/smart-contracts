@@ -28,7 +28,7 @@ contract ListingState {
     }   
     
     function updateOwner (address _newOwner) public onlyValidator {
-        require(ownership <= block.timestamp, "Current owner is still legit");
+        require(ownership < block.timestamp, "Ownership not expired!");
         owner = _newOwner;
     }
     
@@ -85,14 +85,14 @@ contract ListingV2 is ListingState {
     // Must be an owner to extend listing ownership, or the ownership value is in the past (current owner forfeits ownership).
     // In the forfeit case, new sender will be the new owner, and new ownership is present + added up time amount
     function extendOwnership (uint256 _amount) public {
-        require(msg.sender == owner || ownership <= block.timestamp, "Listing: Unauth!");
+        require(msg.sender == owner || ownership <  block.timestamp, "Listing: Unauth!");
         
         ANFTV2(tokenContract).handleListingTx(msg.sender, _amount, true);
 
         uint256 existingOwnership = ownership;
         address existingOwner = owner;
         
-        if (existingOwnership <= block.timestamp) {
+        if (existingOwnership < block.timestamp) {
             owner = msg.sender;
             existingOwnership = block.timestamp;
         }
@@ -109,7 +109,7 @@ contract ListingV2 is ListingState {
 
     function withdraw() public {
         require(msg.sender == owner, "Listing: Unauth!");
-        require(ownership > block.timestamp, "Listing: Ownership expired!");
+        require(ownership >= block.timestamp, "Listing: Ownership expired!");
 
         uint256 credTS = ownership - block.timestamp;
         uint256 daysLeft = credTS.div(86400);
@@ -127,7 +127,7 @@ contract ListingV2 is ListingState {
             T = 86;
         }
 
-        if (block.timestamp > ownership && T > 50) {
+        if (ownership < block.timestamp && T > 50) {
             T = 50;
         }
 
@@ -165,17 +165,19 @@ contract ListingV2 is ListingState {
 
     event Register(address _stakeholder, uint256 _amount, uint256 _optionId, uint256 _start);
     
-    function register (uint256 _amount, uint256 _optionId) public onlyActiveListing {
+    function register (uint256 _amount, uint256 _optionId, bool _increase) public onlyActiveListing {
         require(options[_optionId]._isSet, "Listing: Option not available");
+        uint256 callerBalance = ANFTV2(tokenContract).balanceOf(msg.sender);
+        require(callerBalance >= _amount, "Listing: Insufficient balance!");
 
         StakingModel storage userStake = stakings[_optionId][msg.sender];
 
+        userStake._amount = _increase ? userStake._amount.add(_amount) : userStake._amount.sub(_amount);
         userStake._start = block.timestamp;
-        userStake._amount = userStake._amount.add(_amount);
         userStake._active = true;
 
         options[_optionId]._totalStake = options[_optionId]._totalStake.add(_amount);
-
+  
         totalStake = totalStake.add(_amount);
 
         emit Register(msg.sender, _amount, _optionId, block.timestamp);
@@ -203,6 +205,7 @@ contract ListingV2 is ListingState {
     event UpdateWorker(address _worker, bool _isAuthorized);
     function updateWorker(address _worker) public {
         require(msg.sender == owner, "Listing: Unauth!");
+        require(ownership >= block.timestamp, "Listing: Ownership expired");
         workers[_worker] = !workers[_worker];
         emit UpdateWorker(_worker, workers[_worker]);
     }

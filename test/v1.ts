@@ -1,5 +1,5 @@
 import { Event } from '@ethersproject/contracts';
-import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
+import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/dist/src/signers';
 import { expect } from 'chai';
 import { BigNumber, ContractReceipt } from 'ethers';
 import { ethers } from 'hardhat';
@@ -617,3 +617,4 @@ export  const v1 = () => {
   });
 }
 
+import {  } from "module";

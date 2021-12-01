@@ -205,11 +205,6 @@ export const v2 = () => {
         await expect(ANFTInstance.connect(validator).createListing(stakeholder1.address)).to.be.not.reverted;
       });
 
-      it('Listing initial version is 1', async () => {
-        const version = await listingInstance.version();
-        expect(version.toNumber()).equal(1);
-      })
-
       it('Only account with DEFAULT_ADMIN_ROLE can set staking address', async () => {
         const initialStakingAddress = await ANFTInstance.stakingAddress();
         expect(initialStakingAddress).equal(stakingAcc.address);
@@ -242,22 +237,6 @@ export const v2 = () => {
         await expect(listingInstance.connect(listingOwner1).updateWorker(worker1.address)).to.be.not.reverted;
         const workerStatus_2 = await listingInstance.workers(worker1.address);
         expect(workerStatus_2);
-      });
-
-      it('Validator and only Validator is able to token contract address', async () => {
-        const tokenContract_1 = await listingInstance.tokenContract();
-        expect(tokenContract_1).equal(ANFTInstance.address);
-
-   
-        await expect(listingInstance.connect(stakeholder1).updateTokenContract(newTokenContract.address)).to.be.revertedWith(
-          'Listing: Unauth!'
-        );
-        await expect(listingInstance.connect(validator).updateTokenContract(newTokenContract.address)).to.be.not.reverted;
-
-        const tokenContract_2 = await listingInstance.tokenContract();
-        expect(tokenContract_2).equal(newTokenContract.address);
-
-
       });
 
       it('Owner with expired ownership cant update worker status', async () => {
@@ -664,8 +643,9 @@ export const v2 = () => {
 
           expect(listingOwnerBal_1.sub(extensionValues)).equal(listingOwnerBal_2);
 
-          const withdrawTx = await listingInstance.connect(listingOwner1).withdraw();
-          const withdrawReceipt = await withdrawTx.wait();
+          const withdrawTx = listingInstance.connect(listingOwner1).withdraw();
+          await expect(withdrawTx).to.emit(listingInstance, 'Withdraw');
+          const withdrawReceipt = await (await withdrawTx).wait();
           const withdrawTS = (await ethers.provider.getBlock(withdrawReceipt.blockNumber)).timestamp;
 
           const dailyPayment = await listingInstance.dailyPayment();

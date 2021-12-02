@@ -1,29 +1,15 @@
 import * as dotenv from 'dotenv';
-
-import { HardhatUserConfig, task } from 'hardhat/config';
+import { HardhatUserConfig } from 'hardhat/config';
 import '@nomiclabs/hardhat-etherscan';
 import '@nomiclabs/hardhat-waffle';
 import '@typechain/hardhat';
 import 'hardhat-gas-reporter';
 import 'solidity-coverage';
-
 import '@nomiclabs/hardhat-ethers';
 import 'hardhat-deploy';
 
 dotenv.config();
 
-// This is a sample Hardhat task. To learn how to create your own go to
-// https://hardhat.org/guides/create-task.html
-// task('accounts', 'Prints the list of accounts', async (args, hre) => {
-//   const accounts = await hre.ethers.getSigners();
-//   console.log(accounts, 'accounts')
-//   for (const account of accounts) {
-//     console.log(account.address);
-//   }
-// });
-
-// You need to export an object to set up your config
-// Go to https://hardhat.org/config/ to learn more
 
 const config: HardhatUserConfig = {
   solidity: {
@@ -37,8 +23,7 @@ const config: HardhatUserConfig = {
   },
   gasReporter: {
     currency: 'USD',
-    coinmarketcap: '78e9055f-940b-41a3-b0a4-c2e20bd0476c',
-    
+    coinmarketcap: process.env.COINMCAP_API_KEY as string, 
     gasPrice: 6,
     // @ts-ignore
     ethPrice: 600,
@@ -55,13 +40,6 @@ const config: HardhatUserConfig = {
       ],
       chainId: 97,
     },
-    // 'bsc-mainnet': {
-    //   url: 'https://bsc-dataseed.binance.org/',
-    //   accounts: [process.env.BSC_MAINNET_DEPLOYER_PRIVATE_KEY as string],
-    //   live: true,
-    //   chainId: 56,
-    // },
-
     'rinkeby': {
       url: process.env.RINKEBY_URL,
       accounts: [

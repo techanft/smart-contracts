@@ -62,9 +62,10 @@ contract ListingV2 is ListingStorage {
     *
     * Token contract should be the Caller/Listing creator address
     */
-    constructor(address _validator, address _owner) {
+    constructor(address _validator, address _owner, uint256 _listingId) {
         owner = _owner;
         validator = _validator;
+        listingId = _listingId;
         ownership = block.timestamp;
         tokenContract = msg.sender;
     }

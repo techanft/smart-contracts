@@ -74,9 +74,9 @@ contract ANFTV2 is ERC20, AccessControl {
      * 
      * Emits a {ListingCreation} event
      */
-    function createListing(address _owner) public {
+    function createListing(address _owner, uint256 _listingId) public {
         require(hasRole(VALIDATOR, msg.sender), "ANFTV2: Unauthorized");
-        ListingV2 newListing = new ListingV2(msg.sender, _owner);
+        ListingV2 newListing = new ListingV2(msg.sender, _owner, _listingId);
         emit ListingCreation(msg.sender, _owner, address(newListing));    
         listingStatus[address(newListing)]._isCreated = true;    
         listingStatus[address(newListing)]._active = true;    

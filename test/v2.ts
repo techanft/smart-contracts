@@ -173,10 +173,12 @@ export const v2 = () => {
       let dailyPayment: BigNumber = tokenAmountBN(2_000);
       let listingCreationBlock: number;
       const extensionValues = tokenAmountBN(30_000);
+      const listingId = 1;
 
       beforeEach(async () => {
         Listing__factory = await ethers.getContractFactory('ListingV2');
-        const listingCreationData = await ANFTInstance.connect(validator).createListing(listingOwner1.address);
+        
+        const listingCreationData = await ANFTInstance.connect(validator).createListing(listingOwner1.address, listingId);
 
         const receipt: ContractReceipt = await listingCreationData.wait();
         listingCreationBlock = receipt.blockNumber;
@@ -199,11 +201,22 @@ export const v2 = () => {
       });
 
       it('Only user with the VALIDATOR role can create listing', async () => {
-        await expect(ANFTInstance.connect(stakeholder1).createListing(stakeholder1.address)).to.be.revertedWith(
+        await expect(ANFTInstance.connect(stakeholder1).createListing(stakeholder1.address, listingId)).to.be.revertedWith(
           'ANFTV2: Unauthorized'
         );
-        await expect(ANFTInstance.connect(validator).createListing(stakeholder1.address)).to.be.not.reverted;
+        await expect(ANFTInstance.connect(validator).createListing(stakeholder1.address, listingId)).to.be.not.reverted;
       });
+
+      it('Validator can update listing ID', async () => {
+        const listingId_1 = await listingInstance.listingId();
+        const newlistingId = 2;
+        await expect(listingId_1).equal(listingId);
+        await expect(listingInstance.connect(stakeholder1).updatelistingId(newlistingId)).to.be.revertedWith("Listing: Unauth!");
+        await expect(listingInstance.connect(validator).updatelistingId(newlistingId)).to.be.not.reverted;
+
+        const listingId_2 = await listingInstance.listingId();
+        await expect(listingId_2).equal(newlistingId);
+      })
 
       it('Only account with DEFAULT_ADMIN_ROLE can set staking address', async () => {
         const initialStakingAddress = await ANFTInstance.stakingAddress();
@@ -402,7 +415,7 @@ export const v2 = () => {
       });
 
       it('Listing Creation event is created with correct arguments', async () => {
-        const createListingTx = ANFTInstance.connect(validator).createListing(listingOwner1.address);
+        const createListingTx = ANFTInstance.connect(validator).createListing(listingOwner1.address, listingId);
         await expect(createListingTx).to.emit(ANFTInstance, 'ListingCreation');
 
         const receipt: ContractReceipt = await (await createListingTx).wait();

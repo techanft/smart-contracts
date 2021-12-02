@@ -15,6 +15,12 @@ contract ListingStorage {
     address public owner;
 
     /**
+     * @dev Listing ID is to bind the Listing NFT on the blockchain with the listing data in
+     * the real world
+     */
+    uint256 public listingId;
+
+    /**
      * @dev Validator is the authorized account to update the listing configurations
      */
     address public validator;
@@ -77,6 +83,13 @@ contract ListingStorage {
         options[_optionId]._isSet = true;
     }   
     
+    /**
+     * @dev Validator can update the listing ID
+     */
+    function updatelistingId (uint256 _listingId) public onlyValidator {
+        listingId = _listingId;
+    }
+
     /**
      * @dev Validator can update the owner value
      * Owner value can only changeable if the current owner has forfeited the listing

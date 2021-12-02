@@ -449,6 +449,14 @@ export const v2 = () => {
           expect(_end).equal(actualOwnership);
         });
 
+        it("Owner can't transfer more than their token balance", async () => {
+          const userBalance = await ANFTInstance.balanceOf(listingOwner1.address);
+          await expect(listingInstance.connect(listingOwner1).extendOwnership(userBalance.add(1))).to.be.revertedWith(
+            'ERC20: transfer amount exceeds balance'
+          );
+          await expect(listingInstance.connect(listingOwner1).extendOwnership(userBalance)).to.be.not.reverted;
+        });
+
         it('Owner cant extend ownership with inactive listing', async () => {
           const ownerBal_1 = await ANFTInstance.balanceOf(listingOwner1.address);
           const SABal_1 = await ANFTInstance.balanceOf(stakingAcc.address);
@@ -627,6 +635,17 @@ export const v2 = () => {
 
           const listingOwnershipAfterWithdrawing = await listingInstance.ownership();
           expect(listingOwnershipAfterWithdrawing.toNumber() === withdrawTS);
+        });
+
+        it('Cant withdraw with insufficient funds balance', async () => {
+          await listingInstance.connect(listingOwner1).extendOwnership(extensionValues);
+
+          const fundsBalance = await ANFTInstance.balanceOf(stakingAcc.address);
+          await ANFTInstance.connect(stakingAcc).transfer(stakingAcc2.address, fundsBalance);
+
+          await expect(listingInstance.connect(listingOwner1).withdraw()).to.be.revertedWith(
+            'ERC20: transfer amount exceeds balance'
+          );
         });
 
         it('Value will be transfered back, from Staking Address to Owner', async () => {
@@ -1071,6 +1090,15 @@ export const v2 = () => {
           expect(SABal_1).equal(SABal_2);
           expect(SHBal_1).equal(SHBal_2);
           expect(rewardPool_1).equal(rewardPool_2);
+        });
+        
+        it('Cant claim reward if funds balance is insufficient', async () => {
+          const fundsBalance = await ANFTInstance.balanceOf(stakingAcc.address);
+          await ANFTInstance.connect(stakingAcc).transfer(stakingAcc2.address, fundsBalance);
+
+          await expect(listingInstance.connect(stakeholder1).claimReward(option0)).to.be.revertedWith(
+            'ERC20: transfer amount exceeds balance'
+          );
         });
 
         it('Stakeholder balance must have at least registered amount to claim reward', async () => {

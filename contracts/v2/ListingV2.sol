@@ -117,7 +117,7 @@ contract ListingV2 is ListingStorage {
     *      OS (timestamp): Exisiting ownership
     *      TS (timestamp): Current block timestamp
     *      D  (tokens):  Daily payment, specified by the validator
-    *      VR (tokens): Value (tokens) to return to the owner
+    *      VR (tokens): Value to return to the owner
     *
     * `valueToReturn` shall be transfered from Funds account to user, if success the ownership value
     * should be reset to current TS, and rewardPool is decreased by `valueToReturn`

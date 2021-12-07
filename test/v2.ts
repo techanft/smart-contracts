@@ -6,7 +6,7 @@ import { ethers } from 'hardhat';
 import { ANFTV2__factory, ListingV2__factory, ANFTV2, ListingV2 } from '../typechain';
 import { tokenAmountBN } from './v1';
 
-const litingAddrFromListingCreationEvent = (events: Event[] | undefined): string => {
+export const litingAddrFromListingCreationEvent = (events: Event[] | undefined): string => {
   const ListingCreatedEvent = events?.find(({ event }) => event == 'ListingCreation');
   return ListingCreatedEvent?.args?._listingAddress;
 };

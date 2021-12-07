@@ -24,7 +24,7 @@ const config: HardhatUserConfig = {
   gasReporter: {
     currency: 'USD',
     coinmarketcap: process.env.COINMCAP_API_KEY as string, 
-    gasPrice: 6,
+    gasPrice: 5,
     // @ts-ignore
     ethPrice: 600,
   },
@@ -47,6 +47,14 @@ const config: HardhatUserConfig = {
         process.env.TESTNET_STAKING_ADDR_PRIVATE_KEY as string,
       ],
       chainId: 4,
+    },
+    'goerli': {
+      url: process.env.GOERLI_URL,
+      accounts: [
+        process.env.TESTNET_DEPLOYER_PRIVATE_KEY as string,
+        process.env.TESTNET_STAKING_ADDR_PRIVATE_KEY as string,
+      ],
+      chainId: 5,
     },
   },
   etherscan: {

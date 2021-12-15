@@ -101,7 +101,7 @@ contract ListingV2 is ListingStorage {
         uint256 credDays = _amount.div(dailyPayment);
         
         ownership = existingOwnership.add(credDays.mul(86400));
-        emit OwnershipExtension(existingOwner, owner, existingOwnership, ownership, _amount);
+        emit OwnershipExtension(existingOwner, owner, existingOwnership, ownership);
 
     }
 
@@ -291,7 +291,7 @@ contract ListingV2 is ListingStorage {
      * `_end` is when the ownership ends
      * `_amount` is the transfered amount
      */
-    event OwnershipExtension (address _prevOwner, address _newOwner, uint256 _start, uint256 _end, uint256 _amount);
+    event OwnershipExtension (address _prevOwner, address _newOwner, uint256 _start, uint256 _end);
 
     /**
      * @dev Emitted when the owner withdraws tokens (forfeit ownership)

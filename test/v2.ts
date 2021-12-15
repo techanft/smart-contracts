@@ -531,7 +531,7 @@ export const v2 = () => {
 
           const receipt: ContractReceipt = await (await extensionTx).wait();
 
-          const { _prevOwner, _newOwner, _start, _end, _amount } = receipt.events?.find(
+          const { _prevOwner, _newOwner, _start, _end } = receipt.events?.find(
             ({ event }) => event === 'OwnershipExtension'
           )?.args as any;
 
@@ -539,7 +539,6 @@ export const v2 = () => {
           expect(_newOwner).to.equal(listingOwner1.address);
           expect(_start).to.equal(expectedStart);
           expect(_end).to.equal(expectedEnd);
-          expect(_amount).to.equal(expectedAmount);
 
           await expect(extensionTx).to.emit(listingInstance, 'OwnershipExtension');
         });

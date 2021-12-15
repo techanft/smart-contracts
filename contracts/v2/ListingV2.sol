@@ -240,13 +240,13 @@ contract ListingV2 is ListingStorage {
 
     *   T(%)      : Percentage for total token rewarding (less or equal than 86)
     *               If listing is forfeited, T is less or equal than 50
-    *   TS        :   Total tokens staked for the listing
-    *   LV        :   Listing value
-    *   RTd       :  Total tokens for rewarding daily for ALL stakeholder (daily avaiable tokens for claiming)
-    *   DA        :   Daily Payment
-    *   Ap(%)     :     Reward percentage value for the chosen option
-    *   At(tokens): The staked amount for an option by the stakeholder
-    *   Ax(tokens): Available daily tokens for claiming for ONE stakeholder for one option
+    *   TS        : Total tokens staked for the listing
+    *   LV        : Listing value
+    *   RTd       : Total tokens for rewarding daily for ALL stakeholder (daily avaiable tokens for claiming)
+    *   DA        : Daily Payment
+    *   Ap(%)     : Reward percentage value for the chosen option
+    *   At(tokens): The total staked amount for an option from ALL stakeholders
+    *   Ax(tokens): The staked amount for an option from the calling stakeholder (msg.sender)
     *   Ar(tokens): Available daily tokens for claiming for ONE stakeholder for one option
     *   Sd(days)  : Staked days
     *   Rm(tokens): The reward for a stakeholder after a period of time

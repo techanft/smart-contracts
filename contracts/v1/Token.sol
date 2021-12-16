@@ -1,11 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import "@openzeppelin/contracts/access/AccessControl.sol";
-import "./ListingV2.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "./Listing.sol";
 
-contract ANFTV2 is ERC20, AccessControl {
+contract Token is Initializable, ERC20Upgradeable, AccessControlUpgradeable, UUPSUpgradeable {
+
     /**
      * @dev Validators are authorized accounts to handle listing
      */
@@ -15,6 +18,11 @@ contract ANFTV2 is ERC20, AccessControl {
      * @dev The funds address for paying out rewards and receiving payments
      */
     address public stakingAddress;
+
+    /**
+     * @dev Deployer has the default roles of DEFAULT_ADMIN_ROLE and VALIDATOR
+     * Staking address is set here
+     */
 
     /**
      * @dev A listing address must be both `_isCreated` and `_active` to be able to operate.
@@ -31,16 +39,23 @@ contract ANFTV2 is ERC20, AccessControl {
     }
     mapping (address => ListingStatusModel) public listingStatus;
 
-    /**
-     * @dev Deployer has the default roles of DEFAULT_ADMIN_ROLE and VALIDATOR
-     * Staking address is set here
-     */
-    constructor(address _stakingAddr) ERC20("ANFT Token", "ANFT") {
-        _mint(msg.sender, 1232000000 * 10 ** decimals());
+    function initialize(address _stakingAddr) public initializer {
+
+        __UUPSUpgradeable_init();
+        __AccessControl_init();
+        __ERC20_init("ANFT Token", "ANFT");
+
+        _mint(_msgSender(),  1232000000 * 10 ** decimals());
         stakingAddress = _stakingAddr;
-        _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
-        _setupRole(VALIDATOR, msg.sender);
+        _setupRole(DEFAULT_ADMIN_ROLE, _msgSender());
+        _setupRole(VALIDATOR, _msgSender());
     }
+
+    function _authorizeUpgrade(address newImplementation)
+        internal
+        override
+        onlyRole(DEFAULT_ADMIN_ROLE)
+    {}
 
     /**
      * @dev Handle transactions from listings and only from listings
@@ -53,8 +68,8 @@ contract ANFTV2 is ERC20, AccessControl {
      * Emits a {Transfer} event from IERC20
      */
     function handleListingTx (address _userAddr, uint256 _amount, bool _in) external returns (bool) {
-        require(listingStatus[msg.sender]._isCreated, "ANFTV2: Invalid Listing");
-        require(listingStatus[msg.sender]._active, "ANFTV2: Inactive Listing");
+        require(listingStatus[_msgSender()]._isCreated, "Token: Invalid Listing");
+        require(listingStatus[_msgSender()]._active, "Token: Inactive Listing");
         address sender;
         address recipient;
         (sender, recipient) = _in ? (_userAddr, stakingAddress) : (stakingAddress, _userAddr);
@@ -75,9 +90,9 @@ contract ANFTV2 is ERC20, AccessControl {
      * Emits a {ListingCreation} event
      */
     function createListing(address _owner, uint256 _listingId) public {
-        require(hasRole(VALIDATOR, msg.sender), "ANFTV2: Unauthorized");
-        ListingV2 newListing = new ListingV2(msg.sender, _owner, _listingId);
-        emit ListingCreation(msg.sender, _owner, address(newListing));    
+        require(hasRole(VALIDATOR, _msgSender()), "Token: Unauthorized");
+        Listing newListing = new Listing(_msgSender(), _owner, _listingId);
+        emit ListingCreation(_msgSender(), _owner, address(newListing));    
         listingStatus[address(newListing)]._isCreated = true;    
         listingStatus[address(newListing)]._active = true;    
     }
@@ -91,8 +106,8 @@ contract ANFTV2 is ERC20, AccessControl {
      * 
      */
     function toggleListingStatus (address _listingAddr) public {
-        require(hasRole(VALIDATOR, msg.sender), "ANFTV2: Unauthorized");
-        require(listingStatus[_listingAddr]._isCreated, "ANFTV2: Invalid Listing");
+        require(hasRole(VALIDATOR, _msgSender()), "Token: Unauthorized");
+        require(listingStatus[_listingAddr]._isCreated, "Token: Invalid Listing");
         listingStatus[_listingAddr]._active = !listingStatus[_listingAddr]._active;
     }
 
@@ -101,7 +116,7 @@ contract ANFTV2 is ERC20, AccessControl {
      * or the previous address is compromised.
      */    
     function updateStakingAddress (address _stakingAddr) public {
-        require(hasRole(DEFAULT_ADMIN_ROLE, msg.sender), "ANFTV2: Unauthorized");
+        require(hasRole(DEFAULT_ADMIN_ROLE, _msgSender()), "Token: Unauthorized");
         stakingAddress = _stakingAddr;
         emit UpdateStakingAddr(_stakingAddr);
     }
@@ -117,5 +132,7 @@ contract ANFTV2 is ERC20, AccessControl {
      * @dev Emitted when the staking address is updated, `_stakingAddr` should be the new address 
      */
     event UpdateStakingAddr(address _stakingAddr);
+
 }
+
 

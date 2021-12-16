@@ -6,6 +6,7 @@ import '@typechain/hardhat';
 import 'hardhat-gas-reporter';
 import 'solidity-coverage';
 import '@nomiclabs/hardhat-ethers';
+import '@openzeppelin/hardhat-upgrades';
 import 'hardhat-deploy';
 
 dotenv.config();
@@ -17,7 +18,7 @@ const config: HardhatUserConfig = {
     settings: {
       optimizer: {
         enabled: true,
-        runs: 1,
+        // runs: 1,
       },
     },
   },
@@ -33,7 +34,7 @@ const config: HardhatUserConfig = {
       saveDeployments: false,
     },
     'bsc-testnet': {
-      url: 'https://data-seed-prebsc-1-s2.binance.org:8545',
+      url: process.env.BSC_TESTNET_URL,
       accounts: [
         process.env.TESTNET_DEPLOYER_PRIVATE_KEY as string,
         process.env.TESTNET_STAKING_ADDR_PRIVATE_KEY as string,
@@ -58,7 +59,7 @@ const config: HardhatUserConfig = {
     },
   },
   etherscan: {
-    apiKey: process.env.BSC_SCAN_KEY,
+    apiKey: process.env.ETH_SCAN_KEY,
   },
   namedAccounts: {
     deployer: 0,

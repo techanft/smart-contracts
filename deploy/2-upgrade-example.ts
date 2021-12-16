@@ -5,15 +5,14 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const { deployments, getNamedAccounts } = hre;
   const { deploy } = deployments;
   const { deployer, stakingAddress } = await getNamedAccounts();
-  
-  await deploy('ANFTV2', {
+
+  await deploy('TestUpgrade', {
     from: deployer,
-    args: [stakingAddress],
+    args: [],
     log: true,
   });
-
 };
 
-func.tags = ['anft-v2'];
+func.tags = ['upgrade-example'];
 export default func;
-// npx hardhat --network bsc-testnet deploy --tags anft-v2
+// npx hardhat --network rinkeby deploy --tags upgrade-example

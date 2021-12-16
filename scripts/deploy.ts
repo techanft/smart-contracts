@@ -28,4 +28,3 @@ main().catch((error) => {
   console.error(error);
   process.exitCode = 1;
 });
-// npx hardhat verify --network bsc-testnet 0xd586442b20b00dfcb0e2476c0bb260f123189288 "0xbB16550010cA6e7648A065a3DA7ccff39CEfcAC5"

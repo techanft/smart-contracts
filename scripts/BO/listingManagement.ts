@@ -1,5 +1,6 @@
 import { ContractReceipt, ethers } from 'ethers';
-import listingArtifact from '../../artifacts/contracts/v2/ListingV2.sol/ListingV2';
+// import listingArtifact from '../../artifacts/contracts/v1/Listing.sol/Listing';
+import listingArtifact from '../../artifacts/contracts/v1/Listing.sol/Listing';
 import { getWalletByPK } from '../../utils';
 import provider from './provider';
 

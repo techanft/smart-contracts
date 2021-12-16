@@ -1,6 +1,6 @@
 import { ContractReceipt, ethers } from 'ethers';
 import tokenArtifact from '../../deployments/bsc-testnet/ANFTV2';
-import { litingAddrFromListingCreationEvent } from '../../test/v2';
+import { litingAddrFromListingCreationEvent } from '../../test/utils';
 import { getWalletByPK } from '../../utils';
 import provider from './provider';
 

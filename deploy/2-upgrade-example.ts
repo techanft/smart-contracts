@@ -29,3 +29,4 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 func.tags = ['upgrade-example'];
 export default func;
 // npx hardhat --network rinkeby deploy --tags upgrade-example
+// npx hardhat --network rinkeby etherscan-verify --api-key ''

@@ -28,9 +28,9 @@ export const calculateOwnershipExtension = async ({
 
   const dailyPayment = await instance.dailyPayment();
 
-  const creditInDays = (await transferedAmount.div(dailyPayment)).toNumber();
+  const additionalCredit = (transferedAmount.mul(86400).div(dailyPayment)).toNumber();
 
-  const newOwnership = initialOwnership + creditInDays * 86400;
+  const newOwnership = initialOwnership + additionalCredit;
 
   return {
     _start: initialOwnership,

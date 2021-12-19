@@ -49,6 +49,7 @@ export const v1 = () => {
       const deployedData = await ANFTInstance.deployed();
       ANFTAddress = deployedData.address;
       const VALIDATOR = await ANFTInstance.VALIDATOR();
+      
       await ANFTInstance.connect(deployer).grantRole(VALIDATOR, validator.address);
     });
 
@@ -88,7 +89,7 @@ export const v1 = () => {
       let listingValue: BigNumber = tokenAmountBN(420_000);
       let dailyPayment: BigNumber = tokenAmountBN(2_000);
       let listingCreationBlock: number;
-      const extensionValues = tokenAmountBN(30_000);
+      const extensionValues = tokenAmountBN(31_000);
       const listingId = 1;
 
       beforeEach(async () => {
@@ -389,6 +390,14 @@ export const v1 = () => {
             'ERC20: transfer amount exceeds balance'
           );
           await expect(listingInstance.connect(listingOwner1).extendOwnership(userBalance)).to.be.not.reverted;
+        });
+
+        it("Owner must own the listing for at least 1.0 day ({dailyPayment} is the minimum transfer amount)", async () => {
+          const dailyPayment = await listingInstance.dailyPayment();
+          await expect(listingInstance.connect(listingOwner1).extendOwnership(dailyPayment.sub(1))).to.be.revertedWith(
+            'Listing: Insufficient amount!'
+          );
+          await expect(listingInstance.connect(listingOwner1).extendOwnership(dailyPayment)).to.be.not.reverted;
         });
 
         it('Owner cant extend ownership with inactive listing', async () => {

@@ -3,6 +3,8 @@ pragma solidity ^0.8.0;
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "./Token.sol";
 import "./ListingStorage.sol";
+import "hardhat/console.sol";
+
 
 /**
  * @dev This contract represents a real estate product. Basic getter-setters are within {ListingStorage}
@@ -76,18 +78,24 @@ contract Listing is ListingStorage {
     * sender must be listing owner owner to extend listing ownership, OR the ownership value is in the past (current owner forfeits the listing).
     * In the forfeit case, the sender will be the new owner, and new ownership would be time credit added on top of current timestamp
     *
+    * sender must transfer at least {dailyPayment} amount (Own the listing for at least 1.0 day)
+    *
     * Time credit formula:
-    *   C = (A / D) x 86400
-    *      C (timestamp): Time credit (in seconds)
+    *   C = (A  x 86400 / D)
+    *      C (timestamp): Time credit (Unix timestamp)
     *      A (tokens): Transfered amount to extend ownership
     *      D (tokens): Daily payment, specified by the validator
     *      86400: Total seconds in a day (60*60*24)
+    *
+    * Then C is added on top of {block.timestamp} OR the current {ownership} value, depends on whether the listing is forfeited
     */
+
     function extendOwnership (uint256 _amount) public {
         require(msg.sender == owner || ownership <  block.timestamp, "Listing: Unauth!");
         
         bool success = Token(tokenContract).handleListingTx(msg.sender, _amount, true);
         require(success, "Listing: Unsuccessful attempt!");
+        require(_amount >= dailyPayment, "Listing: Insufficient amount!");
 
         uint256 existingOwnership = ownership;
         address existingOwner = owner;
@@ -98,9 +106,8 @@ contract Listing is ListingStorage {
         }
 
         rewardPool = rewardPool.add(_amount);
-        uint256 credDays = _amount.div(dailyPayment);
         
-        ownership = existingOwnership.add(credDays.mul(86400));
+        ownership = existingOwnership.add(_amount.mul(86400).div(dailyPayment));
         emit OwnershipExtension(existingOwner, owner, existingOwnership, ownership);
 
     }

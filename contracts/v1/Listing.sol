@@ -119,7 +119,7 @@ contract Listing is ListingStorage {
     *
     * Ownership withdraw formula:
     *   CL = OS - TS
-    *   VR = (CL / 86400) * D
+    *   VR = CL * D / 86400
     *      CL (timestamp): Time credit left
     *      OS (timestamp): Exisiting ownership
     *      TS (timestamp): Current block timestamp
@@ -133,7 +133,7 @@ contract Listing is ListingStorage {
         require(msg.sender == owner, "Listing: Unauth!");
         require(ownership >= block.timestamp, "Listing: Ownership expired!");
 
-        uint256 valueToReturn = ((ownership - block.timestamp).div(86400)).mul(dailyPayment);
+        uint256 valueToReturn = ((ownership - block.timestamp).mul(dailyPayment)).div(86400);
 
         bool success = Token(tokenContract).handleListingTx(msg.sender, valueToReturn, false);
         require(success, "Listing: Unsuccessful attempt!");

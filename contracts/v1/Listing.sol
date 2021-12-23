@@ -73,6 +73,17 @@ contract Listing is ListingStorage {
     }
 
     /**
+     * @dev Owner can update worker status. Which means they can choose/unchoose who
+     * can use the listing in real world
+     */
+    function updateWorker(address _worker) public {
+        require(msg.sender == owner, "Listing: Unauth!");
+        require(ownership >= block.timestamp, "Listing: Ownership expired");
+        workers[_worker] = !workers[_worker];
+        Token(tokenContract).triggerUpdateWorkerEvent(_worker, workers[_worker]);
+    }
+
+    /**
     * @dev Owner can extend ownership by transfering tokens to the staking address
     * 
     * sender must be listing owner owner to extend listing ownership, OR the ownership value is in the past (current owner forfeits the listing).
@@ -108,8 +119,7 @@ contract Listing is ListingStorage {
         rewardPool = rewardPool.add(_amount);
         
         ownership = existingOwnership.add(_amount.mul(86400).div(dailyPayment));
-        emit OwnershipExtension(existingOwner, owner, existingOwnership, ownership);
-
+        Token(tokenContract).triggerOwnershipExtensionEvent(existingOwner, owner, existingOwnership, ownership);
     }
 
     /**
@@ -138,10 +148,10 @@ contract Listing is ListingStorage {
         bool success = Token(tokenContract).handleListingTx(msg.sender, valueToReturn, false);
         require(success, "Listing: Unsuccessful attempt!");
 
-        emit Withdraw(owner, valueToReturn);
 
         rewardPool = rewardPool.sub(valueToReturn);
         ownership = block.timestamp;
+        Token(tokenContract).triggerWithdrawEvent(owner, valueToReturn);
     }
 
     /**
@@ -166,7 +176,7 @@ contract Listing is ListingStorage {
         bool success = Token(tokenContract).handleListingTx(msg.sender, payoutAmount, false);
         require(success, "Listing: Unsuccessful attempt!");
 
-        emit Claim(msg.sender, payoutAmount, userStake._start, block.timestamp);
+        Token(tokenContract).triggerClaimEvent(msg.sender, payoutAmount, userStake._start, block.timestamp);
 
         userStake._start = block.timestamp;
         rewardPool = rewardPool.sub(payoutAmount);              
@@ -204,7 +214,7 @@ contract Listing is ListingStorage {
   
         totalStake = totalStake.add(_amount);
 
-        emit Register(msg.sender, _amount, _optionId, block.timestamp);
+        Token(tokenContract).triggerRegisterEvent(msg.sender, _amount, _optionId);
     }
 
     /**
@@ -234,7 +244,7 @@ contract Listing is ListingStorage {
         userStake._active = false;
         userStake._start = 0;
 
-        emit Unregister(msg.sender, block.timestamp, _optionId);
+        Token(tokenContract).triggerUnregisterEvent(msg.sender, _optionId);
     }
 
     /**
@@ -288,49 +298,5 @@ contract Listing is ListingStorage {
         require(_active, "Listing: Inactive listing!");
         _;
     }
-
-    /**
-     * @dev Emitted when the owner extends ownership with the listing
-     *
-     * `_prevOwner` is the previous owner address
-     * `_newOwner` is the new owner address
-     * `_start` is the existing ownership
-     * `_end` is when the ownership ends
-     * `_amount` is the transfered amount
-     */
-    event OwnershipExtension (address _prevOwner, address _newOwner, uint256 _start, uint256 _end);
-
-    /**
-     * @dev Emitted when the owner withdraws tokens (forfeit ownership)
-     *
-     * `owner` is the owner withdrawing
-     * `_valueToReturn` is the amount to return to the owner
-     */
-    event Withdraw (address owner, uint256 _valueToReturn);
-
-    /** @dev Emitted when an user claiming rewards
-     *
-     * `_stakeholder` is the stakeholder 
-     * `_reward` is the reward amount
-     * `_from` -> `_to` is the staking period of time
-     */
-    event Claim(address _stakeholder, uint256 _reward, uint256 _from, uint256 _to);
-
-    /** @dev Emitted when an user registers for claiming rewards
-     *
-     * `_stakeholder` is the stakeholder 
-     * `_amount` is the registered amount
-     * `_optionId` is the chosen option
-     * `_start` is when the user registers
-     */
-    event Register(address _stakeholder, uint256 _amount, uint256 _optionId, uint256 _start);
-
-    /** @dev Emitted when an user unregisters for claiming rewards
-     *
-     * `_stakeholder` is the stakeholder 
-     * `_at` is when the user unregisters
-     */
-    event Unregister(address _stakeholder, uint256 _at, uint256 _optionId);
-
 
 }

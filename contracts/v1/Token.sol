@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity 0.8.10;
 
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
@@ -67,9 +67,7 @@ contract Token is Initializable, ERC20Upgradeable, AccessControlUpgradeable, UUP
      *
      * Emits a {Transfer} event from IERC20
      */
-    function handleListingTx (address _userAddr, uint256 _amount, bool _in) external returns (bool) {
-        require(listingStatus[_msgSender()]._isCreated, "Token: Invalid Listing");
-        require(listingStatus[_msgSender()]._active, "Token: Inactive Listing");
+    function handleListingTx (address _userAddr, uint256 _amount, bool _in)  external onlyValidListing returns (bool) {
         address sender;
         address recipient;
         (sender, recipient) = _in ? (_userAddr, stakingAddress) : (stakingAddress, _userAddr);
@@ -122,6 +120,43 @@ contract Token is Initializable, ERC20Upgradeable, AccessControlUpgradeable, UUP
     }
 
     /**
+     * @notice The below functions are to trigger listing events
+     */    
+    function triggerUpdateWorkerEvent(address _worker, bool _isAuthorized) external onlyValidListing {
+        emit UpdateWorker(_msgSender(), _worker, _isAuthorized);
+    }
+
+    function triggerOwnershipExtensionEvent(address _prevOwner, address _newOwner, uint256 _start, uint256 _end) external onlyValidListing {
+        emit OwnershipExtension(_msgSender(), _prevOwner, _newOwner, _start, _end);
+    }
+
+    function triggerWithdrawEvent(address _owner, uint256 _valueToReturn) external onlyValidListing {
+        emit Withdraw(_msgSender(), _owner, _valueToReturn);
+    }
+
+    function triggerClaimEvent(address _stakeholder, uint256 _reward, uint256 _from, uint256 _to) external onlyValidListing {
+        emit Claim(_msgSender(), _stakeholder, _reward, _from, _to);
+    }
+
+    function triggerRegisterEvent(address _stakeholder, uint256 _amount, uint256 _optionId) external onlyValidListing {
+        emit Register(_msgSender(), _stakeholder, _amount, _optionId);
+    }
+
+    function triggerUnregisterEvent(address _stakeholder, uint256 _optionId) external onlyValidListing {
+        emit Unregister(_msgSender(), _stakeholder, _optionId);
+    }
+
+     /**
+     * @dev Modifier, making sure the listing caller is a valid listing
+     */
+    modifier onlyValidListing() {
+        require(listingStatus[_msgSender()]._isCreated, "Token: Invalid Listing");
+        require(listingStatus[_msgSender()]._active, "Token: Inactive Listing");
+        _;
+    }
+
+
+    /**
      * @dev Emitted a new Listing is created. `_validator` should be the caller, 
      * `_owner` should be the specified address and `_listingAddress` is the
      * newly created listing address
@@ -133,6 +168,59 @@ contract Token is Initializable, ERC20Upgradeable, AccessControlUpgradeable, UUP
      */
     event UpdateStakingAddr(address _stakingAddr);
 
+    /**
+     * @notice Below are events triggered from individual listing contract. These events are off-loaded from
+     * separated contracts to this token contract, so that we can "listen" to listing events in one place
+     */
+    
+    /**
+     * @dev Emitted when the worker status of a listing is updated.
+     *
+     * `_worker` is the updated address, `_isAuthorized` is the new status
+     */
+    event UpdateWorker(address _listing, address _worker, bool _isAuthorized);
+
+    /**
+     * @dev Emitted when the owner extends ownership with a listing
+     *
+     * `_prevOwner` is the previous owner address
+     * `_newOwner` is the new owner address
+     * `_start` is the existing ownership
+     * `_end` is when the ownership ends
+     * `_amount` is the transfered amount
+     */
+    event OwnershipExtension (address _listing, address _prevOwner, address _newOwner, uint256 _start, uint256 _end);
+
+    /**
+     * @dev Emitted when the owner withdraws tokens (forfeit ownership for a listing)
+     *
+     * `owner` is the owner withdrawing
+     * `_valueToReturn` is the amount to return to the owner
+     */
+    event Withdraw (address _listing, address owner, uint256 _valueToReturn);
+
+    /** @dev Emitted when an user claiming rewards
+     *
+     * `_stakeholder` is the stakeholder 
+     * `_reward` is the reward amount
+     * `_from` -> `_to` is the staking period of time
+     */
+    event Claim(address _listing, address _stakeholder, uint256 _reward, uint256 _from, uint256 _to);
+
+    /** @dev Emitted when an user registers for claiming rewards
+     *
+     * `_stakeholder` is the stakeholder 
+     * `_amount` is the registered amount
+     * `_optionId` is the chosen option
+     */
+    event Register(address _listing, address _stakeholder, uint256 _amount, uint256 _optionId);
+
+    /** @dev Emitted when an user unregisters for claiming rewards
+     *
+     * `_stakeholder` is the stakeholder 
+     * `_optionId` is the unregistered option
+     */
+    event Unregister(address _listing, address _stakeholder, uint256 _optionId);
+
+
 }
-
-

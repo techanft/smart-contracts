@@ -119,17 +119,6 @@ contract ListingStorage {
     function updateValidator (address _validator) public onlyValidator {
         validator = _validator;
     }
-
-    /**
-     * @dev Owner can update worker status. Which means they can choose/unchoose who
-     * can use the listing in real world
-     */
-    function updateWorker(address _worker) public {
-        require(msg.sender == owner, "Listing: Unauth!");
-        require(ownership >= block.timestamp, "Listing: Ownership expired");
-        workers[_worker] = !workers[_worker];
-        emit UpdateWorker(_worker, workers[_worker]);
-    }
     
     /**
      * @dev Modifier, restricting access to only the validator
@@ -139,10 +128,4 @@ contract ListingStorage {
         _;
     }
 
-    /**
-     * @dev Emitted when the worker status is updated.
-     *
-     * `_worker` is the updated address, `_isAuthorized` is the new status
-     */
-    event UpdateWorker(address _worker, bool _isAuthorized);
 }

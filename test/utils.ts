@@ -35,7 +35,6 @@ export const calculateOwnershipExtension = async ({
   return {
     _start: initialOwnership,
     _end: newOwnership,
-    _amount: transferedAmount,
   };
 };
 interface ICalAvlbleToknForWthdrwing {

@@ -9,7 +9,7 @@ const { VALIDATOR_PK } = process.env;
 // Replace your listing validator PK here
 const listingValidator_PK = 'something';
 
-const validatorWallet = getWalletByPK(VALIDATOR_PK as string, provider);
+const validatorWallet = getWalletByPK(VALIDATOR_PK as string);
 
 // const listingAddress = 'something';
 const listingAddress = '0x00C8135e295AE2eF9652Ec2dA96a1A6aB7A4de12';
@@ -52,7 +52,7 @@ const updateDailyPayment = async (newValue: string) => {
 // updateDailyPayment("1200.131")
 
 // Script for mass update
-const listingAddrs = [
+export const listingAddrs = [
   '0x00C8135e295AE2eF9652Ec2dA96a1A6aB7A4de12',
   '0x92f8b987A6a900C20E7440a651063A9F30bCA1bb',
   '0x8ad12413355FE4edEe377B9B570DfD0256d5AEfA',

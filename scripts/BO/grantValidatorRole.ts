@@ -13,7 +13,7 @@ export const TokenInstance = new ethers.Contract(tokenAddress, tokenABI, provide
 const grantValidatorRole = async (validatorAddress: string) => {
   if (!TESTNET_DEPLOYER_PRIVATE_KEY) return;
 
-  const deployerWallet = getWalletByPK(TESTNET_DEPLOYER_PRIVATE_KEY, provider);
+  const deployerWallet = getWalletByPK(TESTNET_DEPLOYER_PRIVATE_KEY);
 
   const contractWithSigner = await TokenInstance.connect(deployerWallet);
   const validatorRole = await contractWithSigner.VALIDATOR();

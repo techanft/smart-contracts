@@ -1,4 +1,5 @@
 import { BigNumber, ethers } from 'ethers';
+import provider from './provider';
 
 
 
@@ -32,3 +33,7 @@ export const randomizeArray = () => {
   }
   return output;
 };
+
+export const getWalletByPK = (PK :string ) => {
+  return new ethers.Wallet(PK, provider);
+}

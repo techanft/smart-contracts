@@ -2,12 +2,11 @@ import { ContractReceipt } from 'ethers';
 import { litingAddrFromListingCreationEvent } from '../../test/utils';
 import { getWalletByPK } from '../../utils';
 import { TokenInstance } from './grantValidatorRole';
-import provider from './provider';
 
 const { VALIDATOR_PK } = process.env;
 
 const createListing = async (listingID: string | number, ownerAddr: string) => {
-  const validatorWallet = getWalletByPK(VALIDATOR_PK as string, provider);
+  const validatorWallet = getWalletByPK(VALIDATOR_PK as string);
 
   const contractWithSigner = await TokenInstance.connect(validatorWallet);
 

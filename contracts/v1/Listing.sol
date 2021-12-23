@@ -234,7 +234,7 @@ contract Listing is ListingStorage {
         userStake._active = false;
         userStake._start = 0;
 
-        emit Unregister(msg.sender, block.timestamp);
+        emit Unregister(msg.sender, block.timestamp, _optionId);
     }
 
     /**
@@ -330,7 +330,7 @@ contract Listing is ListingStorage {
      * `_stakeholder` is the stakeholder 
      * `_at` is when the user unregisters
      */
-    event Unregister(address _stakeholder, uint _at);
+    event Unregister(address _stakeholder, uint256 _at, uint256 _optionId);
 
 
 }

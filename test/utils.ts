@@ -50,8 +50,7 @@ export const calculateAvailableTokenForWithdrawing = ({
   dailyPayment,
 }: ICalAvlbleToknForWthdrwing) => {
   const creditLeftTS = existingOwnership.sub(currentBlockTS);
-  const daysLeft = creditLeftTS.div(86400).toNumber();
-  const valueToReturn = dailyPayment.mul(daysLeft);
+  const valueToReturn = creditLeftTS.mul(dailyPayment).div(86400);
   return valueToReturn;
 };
 

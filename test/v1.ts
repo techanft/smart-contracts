@@ -878,11 +878,13 @@ export const v1 = () => {
           const receipt = await (await unregisterTx).wait();
           const unregisterTS = (await ethers.provider.getBlock(receipt.blockNumber)).timestamp;
 
-          const { _stakeholder, _at } = receipt.events?.find(({ event }) => event === 'Unregister')?.args as any;
+          const { _stakeholder, _at, _optionId } = receipt.events?.find(({ event }) => event === 'Unregister')?.args as any;
 
           expect(_stakeholder).equal(stakeholder1.address);
 
           expect(_at).equal(BigNumber.from(unregisterTS));
+
+          expect(_optionId).equal(BigNumber.from(option0));
         });
       });
 

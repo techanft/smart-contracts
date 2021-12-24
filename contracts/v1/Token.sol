@@ -130,8 +130,8 @@ contract Token is Initializable, ERC20Upgradeable, AccessControlUpgradeable, UUP
         emit OwnershipExtension(_msgSender(), _prevOwner, _newOwner, _start, _end);
     }
 
-    function triggerWithdrawEvent(address _owner, uint256 _valueToReturn) external onlyValidListing {
-        emit Withdraw(_msgSender(), _owner, _valueToReturn);
+    function triggerWithdrawEvent(address _owner, uint256 _amount, uint256 _initOwnership, uint256 _newOwnership) external onlyValidListing {
+        emit Withdraw(_msgSender(), _owner, _amount, _initOwnership, _newOwnership);
     }
 
     function triggerClaimEvent(address _stakeholder, uint256 _reward, uint256 _from, uint256 _to) external onlyValidListing {
@@ -195,9 +195,11 @@ contract Token is Initializable, ERC20Upgradeable, AccessControlUpgradeable, UUP
      * @dev Emitted when the owner withdraws tokens (forfeit ownership for a listing)
      *
      * `owner` is the owner withdrawing
-     * `_valueToReturn` is the amount to return to the owner
+     * `_amount` is the amount to return to the owner
+     * `_initOwnership` is the initial ownership value
+     * `_newOwnership` is the updated ownership value
      */
-    event Withdraw (address _listing, address owner, uint256 _valueToReturn);
+    event Withdraw (address _listing, address owner, uint256 _amount, uint256 _initOwnership, uint256 _newOwnership);
 
     /** @dev Emitted when an user claiming rewards
      *

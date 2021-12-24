@@ -126,32 +126,38 @@ contract Listing is ListingStorage {
     * @dev Owner can partially withdraw the tokens they previously transfered to extend the listing ownership (and forfeit the ownership)
     * 
     * Ownership value must be in the future (larger or equal to block.timestamp)
+    * 
+    * Owner can input the amount of token they want to withdraw
     *
     * Ownership withdraw formula:
-    *   CL = OS - TS
-    *   VR = CL * D / 86400
-    *      CL (timestamp): Time credit left
-    *      OS (timestamp): Exisiting ownership
-    *      TS (timestamp): Current block timestamp
+    *   RC = A * 86400 / D
+    *   OS2 = OS1 - RC
+    *      A  (tokens)    : Amount of tokens the owner wishes to withdraw
+    *      RC (timestamp) : Removed credit based on {_amount} input
+    *      OS1 (timestamp): Original/Intial ownership before withdrawal
+    *      OS2 (timestamp): New Ownership value after withdrawal
     *      D  (tokens):  Daily payment, specified by the validator
-    *      VR (tokens): Value to return to the owner
     *
-    * `valueToReturn` shall be transfered from Funds account to user, if success the ownership value
-    * should be reset to current TS, and rewardPool is decreased by `valueToReturn`
+    * `OS2` must be in the future (larger or equal to block.timestamp)
+    *
+    * `_amount` shall be transfered from Funds account to user, if success the ownership value
+    * should be reset to current TS, and rewardPool is decreased by `_amount`
     */
-    function withdraw() public {
+    function withdraw(uint256 _amount) public {
         require(msg.sender == owner, "Listing: Unauth!");
         require(ownership >= block.timestamp, "Listing: Ownership expired!");
 
-        uint256 valueToReturn = ((ownership - block.timestamp).mul(dailyPayment)).div(86400);
+        uint256 removedCreditTimestamp = _amount.mul(86400).div(dailyPayment);
+        uint256 newOwnership = ownership.sub(removedCreditTimestamp);
 
-        bool success = Token(tokenContract).handleListingTx(msg.sender, valueToReturn, false);
+        require(newOwnership >= block.timestamp, "Listing: Invalid amount!");
+
+        bool success = Token(tokenContract).handleListingTx(msg.sender, _amount, false);
         require(success, "Listing: Unsuccessful attempt!");
 
-
-        rewardPool = rewardPool.sub(valueToReturn);
-        ownership = block.timestamp;
-        Token(tokenContract).triggerWithdrawEvent(owner, valueToReturn);
+        rewardPool = rewardPool.sub(_amount);
+        Token(tokenContract).triggerWithdrawEvent(owner, _amount, ownership, newOwnership);
+        ownership = newOwnership;
     }
 
     /**

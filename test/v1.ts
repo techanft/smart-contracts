@@ -2,6 +2,7 @@ import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/dist/src/signers';
 import { expect } from 'chai';
 import { BigNumber, ContractReceipt } from 'ethers';
 import { ethers, upgrades } from 'hardhat';
+import { convertBnToDecimal } from '../scripts/BO/utils';
 import { Listing, Listing__factory, TestUpgrade, TestUpgrade__factory, Token, Token__factory } from '../typechain';
 import {
   tokenAmountBN,
@@ -577,10 +578,9 @@ export const v1 = () => {
 
           const newOwnership = await listingInstance.ownership();
           expect(newOwnership).equal(expectedOwnershipValue);
-
         });
-  
-        it("Owner cant withdraw more than the credit left",async () => {
+
+        it('Owner cant withdraw more than the credit left', async () => {
           await listingInstance.connect(listingOwner1).extendOwnership(extensionValues);
 
           const blockNo_1 = await ethers.provider.getBlockNumber();
@@ -592,7 +592,7 @@ export const v1 = () => {
           const maximumTokenToWithdraw_1 = calculateAvailableTokenForWithdrawing({
             currentBlockTS: BigNumber.from(blockTS_1),
             existingOwnership: listingOwnership_1,
-            dailyPayment: listingDP_1
+            dailyPayment: listingDP_1,
           });
 
           await expect(listingInstance.connect(listingOwner1).withdraw(maximumTokenToWithdraw_1)).to.be.revertedWith(
@@ -601,14 +601,13 @@ export const v1 = () => {
 
           const maximumTokenToWithdraw_2 = calculateAvailableTokenForWithdrawing({
             // // Add 5 more minutes to create a difference
-            currentBlockTS: BigNumber.from(blockTS_1).add(300), 
+            currentBlockTS: BigNumber.from(blockTS_1).add(300),
             existingOwnership: listingOwnership_1.add(60),
-            dailyPayment: listingDP_1
+            dailyPayment: listingDP_1,
           });
 
           await expect(listingInstance.connect(listingOwner1).withdraw(maximumTokenToWithdraw_2)).to.be.not.reverted;
-
-        })
+        });
 
         it('Cant withdraw with insufficient funds balance', async () => {
           await listingInstance.connect(listingOwner1).extendOwnership(extensionValues);
@@ -644,10 +643,15 @@ export const v1 = () => {
             dailyPayment,
           });
 
-
           await expect(withdrawTx)
             .to.emit(ANFTInstance, 'Withdraw')
-            .withArgs(listingInstance.address, listingOwner1.address, withdrawAmount, ownership_1, expectedOwnershipValue);
+            .withArgs(
+              listingInstance.address,
+              listingOwner1.address,
+              withdrawAmount,
+              ownership_1,
+              expectedOwnershipValue
+            );
 
           const stakingBal_3 = await ANFTInstance.balanceOf(stakingAcc.address);
           const listingOwnerBal_3 = await ANFTInstance.balanceOf(listingOwner1.address);
@@ -669,7 +673,6 @@ export const v1 = () => {
           const withdrawTx = await listingInstance.connect(listingOwner1).withdraw(withdrawAmount);
           await withdrawTx.wait();
 
-
           const rewardPool_3 = await listingInstance.rewardPool();
 
           expect(rewardPool_2.sub(withdrawAmount)).equal(rewardPool_3);
@@ -686,7 +689,9 @@ export const v1 = () => {
             'Token: Inactive Listing'
           );
 
-          await expect(listingInstance.connect(listingOwner1).withdraw(withdrawAmount)).to.be.revertedWith('Token: Inactive Listing');
+          await expect(listingInstance.connect(listingOwner1).withdraw(withdrawAmount)).to.be.revertedWith(
+            'Token: Inactive Listing'
+          );
 
           const rewardPool_2 = await listingInstance.rewardPool();
           const ownership_2 = await listingInstance.ownership();
@@ -733,14 +738,49 @@ export const v1 = () => {
             .reverted;
         });
 
-        it('User cant register with amount larger than their balance', async () => {
+        it('If {_increase} is marked as true, user balance must gte {_amount} + {_userCurrentStake}', async () => {
           const userBalance = await ANFTInstance.balanceOf(stakeholder1.address);
-
           await expect(
             listingInstance.connect(stakeholder1).register(userBalance.add(1), option0, true)
           ).to.be.revertedWith('Listing: Insufficient balance!');
-          await expect(listingInstance.connect(stakeholder1).register(registeredAmount, option0, true)).to.be.not
-            .reverted;
+          await expect(
+            listingInstance.connect(stakeholder1).register(userBalance, option0, true)
+          ).to.be.not.reverted;
+          await expect(
+            listingInstance.connect(stakeholder1).register(BigNumber.from(1), option0, true)
+          ).to.be.revertedWith('Listing: Insufficient balance!');
+
+          const transferedAmount = tokenAmountBN(100);
+          await ANFTInstance.transfer(stakeholder1.address, transferedAmount);
+
+          await expect(
+            listingInstance.connect(stakeholder1).register(transferedAmount, option0, true)
+          ).to.be.not.reverted;
+          await expect(
+            listingInstance.connect(stakeholder1).register(BigNumber.from(1), option0, true)
+          ).to.be.revertedWith('Listing: Insufficient balance!');
+        });
+
+        it('If {_increase} is marked as false, user balance must gte {_userCurrentStake} - {_amount}', async () => {
+          await listingInstance.connect(stakeholder1).register(registeredAmount, option0, true);
+          const currentUserStake = await listingInstance.stakings(option0, stakeholder1.address); // 100_000
+          
+          const shBal_1 = await ANFTInstance.balanceOf(stakeholder1.address);
+          const amountToRemove = tokenAmountBN(30_000);
+          const amountToTransferAway = currentUserStake._amount.sub(amountToRemove); 
+          await ANFTInstance.connect(stakeholder1).transfer(stakeholder2.address, shBal_1); 
+          await ANFTInstance.transfer(stakeholder1.address, amountToTransferAway); 
+
+
+          await expect(
+            listingInstance.connect(stakeholder1).register(amountToRemove.sub(tokenAmountBN(1)), option0, false)
+          ).to.be.revertedWith('Listing: Insufficient balance!');
+
+          await expect(
+            listingInstance.connect(stakeholder1).register(amountToRemove, option0, false)
+          ).to.be.not.revertedWith('Listing: Insufficient balance!');
+
+
         });
 
         it('User can decrease the staking amount by setting _increase as false', async () => {
@@ -762,7 +802,7 @@ export const v1 = () => {
           expect(stakingRecord_3._amount).equal(stakingRecord_2._amount.sub(stakingRecord_2._amount.div(2)));
         });
 
-        it('Staking info is recorded when user register', async () => {
+        it('Staking info is updated when user register', async () => {
           const stakingRecord_1 = await listingInstance.stakings(option0, stakeholder1.address);
           expect(!stakingRecord_1._active);
 
@@ -777,11 +817,39 @@ export const v1 = () => {
 
           expect(stakingRecord_2._amount).equal(registeredAmount);
           expect(stakingRecord_2._start.toNumber()).equal(registerTS);
-
           expect(stakingRecord_1._active);
         });
 
-        it('Option pool is increased by registered amount', async () => {
+        it("Option's pool stake, user's stake, totalStake is increased and decreased according to the {_increase} flag", async () => {
+          const totalStake_1 = await listingInstance.totalStake();
+          const { _totalStake: totalPoolStake_1 } = await listingInstance.options(option0);
+          const stakingRecord_1 = await listingInstance.stakings(option0, stakeholder1.address);
+
+          // Increase = true
+
+          await listingInstance.connect(stakeholder1).register(registeredAmount, option0, true);
+
+          const totalStake_2 = await listingInstance.totalStake();
+          const { _totalStake: totalPoolStake_2 } = await listingInstance.options(option0);
+          const stakingRecord_2 = await listingInstance.stakings(option0, stakeholder1.address);
+
+          expect(totalStake_1).equal(totalStake_2.sub(registeredAmount));
+          expect(totalPoolStake_1).equal(totalPoolStake_2.sub(registeredAmount));
+          expect(stakingRecord_1._amount).equal(stakingRecord_2._amount.sub(registeredAmount));
+
+          // Increase = false
+          await listingInstance.connect(stakeholder1).register(registeredAmount, option0, false);
+
+          const totalStake_3 = await listingInstance.totalStake();
+          const { _totalStake: totalPoolStake_3 } = await listingInstance.options(option0);
+          const stakingRecord_3 = await listingInstance.stakings(option0, stakeholder1.address);
+
+          expect(totalStake_2).equal(totalStake_3.add(registeredAmount));
+          expect(totalPoolStake_2).equal(totalPoolStake_3.add(registeredAmount));
+          expect(stakingRecord_2._amount).equal(stakingRecord_3._amount.add(registeredAmount));
+        });
+
+        it('Option pool is updated by registered amount', async () => {
           const { _totalStake: totalPoolStake_1 } = await listingInstance.options(option0);
           await listingInstance.connect(stakeholder1).register(registeredAmount, option0, true);
           const { _totalStake: totalPoolStake_2 } = await listingInstance.options(option0);
@@ -1295,7 +1363,9 @@ export const v1 = () => {
             expect(listingOwner).equal(listingOwner1.address);
             expect(listingOwner).not.equal(listingOwner2.address);
 
-            await expect(listingInstance.connect(listingOwner2).withdraw(withdrawAmount)).to.be.revertedWith('Listing: Unauth!');
+            await expect(listingInstance.connect(listingOwner2).withdraw(withdrawAmount)).to.be.revertedWith(
+              'Listing: Unauth!'
+            );
           });
 
           it('Ownership value must not be in the past', async () => {
@@ -1314,49 +1384,46 @@ export const v1 = () => {
               existingOwnership: intialOwnership,
               dailyPayment,
             });
-  
+
             const newOwnership = await listingInstance.ownership();
             expect(newOwnership).equal(expectedOwnershipValue);
-  
           });
 
-          it("Owner cant withdraw more than the credit left",async () => {
+          it('Owner cant withdraw more than the credit left', async () => {
             await listingInstance.connect(listingOwner1).extendOwnership(extensionValues);
-  
+
             const blockNo_1 = await ethers.provider.getBlockNumber();
             const blockInfo_1 = await ethers.provider.getBlock(blockNo_1);
             const blockTS_1 = blockInfo_1.timestamp;
-  
+
             const listingOwnership_1 = await listingInstance.ownership();
             const listingDP_1 = await listingInstance.dailyPayment();
             const maximumTokenToWithdraw_1 = calculateAvailableTokenForWithdrawing({
               currentBlockTS: BigNumber.from(blockTS_1),
               existingOwnership: listingOwnership_1,
-              dailyPayment: listingDP_1
+              dailyPayment: listingDP_1,
             });
-  
+
             await expect(listingInstance.connect(listingOwner1).withdraw(maximumTokenToWithdraw_1)).to.be.revertedWith(
               'Listing: Invalid amount!'
             );
-  
+
             const maximumTokenToWithdraw_2 = calculateAvailableTokenForWithdrawing({
               // // Add 5 more minutes to create a difference
-              currentBlockTS: BigNumber.from(blockTS_1).add(300), 
+              currentBlockTS: BigNumber.from(blockTS_1).add(300),
               existingOwnership: listingOwnership_1.add(60),
-              dailyPayment: listingDP_1
+              dailyPayment: listingDP_1,
             });
-  
-            await expect(listingInstance.connect(listingOwner1).withdraw(maximumTokenToWithdraw_2)).to.be.not.reverted;
-  
-          })
 
+            await expect(listingInstance.connect(listingOwner1).withdraw(maximumTokenToWithdraw_2)).to.be.not.reverted;
+          });
 
           it('Cant withdraw with insufficient funds balance', async () => {
             await listingInstance.connect(listingOwner1).extendOwnership(extensionValues);
-  
+
             const fundsBalance = await upgradeInstance.balanceOf(stakingAcc.address);
             await upgradeInstance.connect(stakingAcc).transfer(stakingAcc2.address, fundsBalance);
-  
+
             await expect(listingInstance.connect(listingOwner1).withdraw(withdrawAmount)).to.be.revertedWith(
               'ERC20: transfer amount exceeds balance'
             );
@@ -1365,36 +1432,41 @@ export const v1 = () => {
           it('Value will be transfered back, from Staking Address to Owner', async () => {
             const stakingBal_1 = await upgradeInstance.balanceOf(stakingAcc.address);
             const listingOwnerBal_1 = await upgradeInstance.balanceOf(listingOwner1.address);
-  
+
             await listingInstance.connect(listingOwner1).extendOwnership(extensionValues);
-  
+
             const stakingBal_2 = await upgradeInstance.balanceOf(stakingAcc.address);
             const listingOwnerBal_2 = await upgradeInstance.balanceOf(listingOwner1.address);
-  
+
             expect(stakingBal_1.add(extensionValues)).equal(stakingBal_2);
-  
+
             expect(listingOwnerBal_1.sub(extensionValues)).equal(listingOwnerBal_2);
-  
+
             const ownership_1 = await listingInstance.ownership();
             const dailyPayment = await listingInstance.dailyPayment();
-  
+
             const withdrawTx = listingInstance.connect(listingOwner1).withdraw(withdrawAmount);
             const expectedOwnershipValue = calNewOwnershipAfterWithdraw({
               withdrawAmount,
               existingOwnership: ownership_1,
               dailyPayment,
             });
-  
-  
+
             await expect(withdrawTx)
               .to.emit(upgradeInstance, 'Withdraw')
-              .withArgs(listingInstance.address, listingOwner1.address, withdrawAmount, ownership_1, expectedOwnershipValue);
-  
+              .withArgs(
+                listingInstance.address,
+                listingOwner1.address,
+                withdrawAmount,
+                ownership_1,
+                expectedOwnershipValue
+              );
+
             const stakingBal_3 = await upgradeInstance.balanceOf(stakingAcc.address);
             const listingOwnerBal_3 = await upgradeInstance.balanceOf(listingOwner1.address);
-  
+
             expect(stakingBal_2.sub(withdrawAmount)).equal(stakingBal_3);
-  
+
             expect(listingOwnerBal_2.add(withdrawAmount)).equal(listingOwnerBal_3);
           });
 
@@ -1593,4 +1665,4 @@ export const v1 = () => {
       });
     });
   });
-}
+};

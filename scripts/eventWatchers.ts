@@ -1,6 +1,6 @@
 import { BigNumber } from 'ethers';
 import { TokenInstance } from './BO/grantValidatorRole';
-import { convertBnToDecimal } from './BO/utils';
+import { convertBnToDecimal } from './BO/utils'; 
 
 // event OwnershipExtension (address _listing, address _prevOwner, address _newOwner, uint256 _start, uint256 _end);
 TokenInstance.on(

@@ -194,7 +194,8 @@ contract Listing is ListingStorage {
     * NOTE The key difference of this staking model is the user's token balance isnt deducted (like other staking models).
     * Users, however, need to have at least registered amount in their balance WHEN they claim rewards
     *
-    * Users must have at least `_amount` tokens in their balance
+    * If `_increase` is true, user's token balance must gte than `_amount` + `currentStake`
+    * If `_increase` is false, user's token balance must gte than  `currentStake` - `_amount`
     *
     * Users cant register for inactive listing
     *
@@ -202,27 +203,28 @@ contract Listing is ListingStorage {
     * `_optionId` is the option which user would like to register
     * `_increase` flag helps user increase/decrease the amount they previously registered
     *
-    * Both listing total stake and option total stake is increased by `_amount`
+    * Both listing total stake and option total stake is increased/decreased by `_amount`, according to the `_increase` flag
     * Emits an {Register} event
     */
     function register (uint256 _amount, uint256 _optionId, bool _increase) public onlyActiveListing {
         require(options[_optionId]._isSet, "Listing: Option not available");
         uint256 callerBalance = Token(tokenContract).balanceOf(msg.sender);
-        require(callerBalance >= _amount, "Listing: Insufficient balance!");
 
         StakingModel storage userStake = stakings[_optionId][msg.sender];
+
+        uint256 amountToCompareAgainst = _increase ? userStake._amount.add(_amount) : userStake._amount.sub(_amount);
+        require(callerBalance >= amountToCompareAgainst, "Listing: Insufficient balance!");
 
         userStake._amount = _increase ? userStake._amount.add(_amount) : userStake._amount.sub(_amount);
         userStake._start = block.timestamp;
         userStake._active = true;
 
-        options[_optionId]._totalStake = options[_optionId]._totalStake.add(_amount);
+        options[_optionId]._totalStake = _increase ? options[_optionId]._totalStake.add(_amount) : options[_optionId]._totalStake.sub(_amount);
   
-        totalStake = totalStake.add(_amount);
+        totalStake = _increase ? totalStake.add(_amount) : totalStake.sub(_amount);
 
         Token(tokenContract).triggerRegisterEvent(msg.sender, _amount, _optionId);
     }
-
     /**
     * @dev User can unregister their previous stake
     * 

@@ -25,7 +25,7 @@ const config: HardhatUserConfig = {
   gasReporter: {
     currency: 'USD',
     coinmarketcap: process.env.COINMCAP_API_KEY as string, 
-    gasPrice: 5,
+    gasPrice: 6,
     // @ts-ignore
     ethPrice: 600,
   },

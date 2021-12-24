@@ -21,4 +21,4 @@ const grantValidatorRole = async (validatorAddress: string) => {
   await tx.wait();
 };
 
-// grantValidatorRole(0xa12dskhjqw3...)
+grantValidatorRole("0x43f96726B105b448798b6eebB04a09ee99921608")

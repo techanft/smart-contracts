@@ -24,4 +24,4 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
 func.tags = ['init-deploy'];
 export default func;
-// npx hardhat --network rinkeby deploy --tags init-deploy
+// npx hardhat --network bsc-testnet deploy --tags init-deploy

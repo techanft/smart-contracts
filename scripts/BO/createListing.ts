@@ -21,19 +21,16 @@ const createListing = async (listingID: string | number, ownerAddr: string) => {
 };
 
 const main = async () => {
-  const owners = [
-    '0x42dFeEDCD1575484DfdC84c216fAD75f3e20528D',
-    '0xeA27071727822834552879E17c2320C81a1bf909',
-    '0x5685BBd01c1e510B01A048f297B4adDFA0ad4BEb',
-  ];
-  await createListing(2, owners[0]);
-  await createListing(3, owners[0]);
-  await createListing(4, owners[0]);
-  await createListing(5, owners[1]);
-  await createListing(6, owners[1]);
-  await createListing(7, owners[1]);
-  await createListing(8, owners[2]);
-  await createListing(9, owners[2]);
-  await createListing(10, owners[2]);
+  const owner = '0x42dFeEDCD1575484DfdC84c216fAD75f3e20528D'; 
+
+  await createListing(2, owner);
+  await createListing(3, owner);
+  await createListing(4, owner);
+  await createListing(5, owner);
+  await createListing(6, owner);
+  await createListing(7, owner);
+  await createListing(8, owner);
+  await createListing(9, owner);
+  await createListing(10, owner);
 };
 main();

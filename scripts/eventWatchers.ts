@@ -33,11 +33,11 @@ TokenInstance.on('UpdateWorker', async (_listing: string, _worker: string, _isAu
   console.log(`---------END LOGGING UpdateWorker--------------`);
 });
 
-TokenInstance.on('Withdraw', async (_listing: string, _owner: string, _amount: string, _initOwnership: BigNumber, _newOwnership: BigNumber) => {
+TokenInstance.on('Withdraw', async (_listing: string, _owner: string, _amount: BigNumber, _initOwnership: BigNumber, _newOwnership: BigNumber) => {
   console.log(`---------BEGIN LOGGING Withdraw--------------`);
   console.log(`_listing: ${_listing}`);
   console.log(`_owner: ${_owner}`);
-  console.log(`_amount: ${_amount}`);
+  console.log(`_amount: ${convertBnToDecimal(_amount)}`);
   console.log(`_initOwnership: ${_initOwnership.toString()}`);
   console.log(`_newOwnership: ${_newOwnership.toString()}`);
   console.log(`---------END LOGGING Withdraw--------------`);
@@ -47,7 +47,7 @@ TokenInstance.on('Claim', async (_listing: string, _stakeholder: string, _reward
   console.log(`---------BEGIN LOGGING Claim--------------`);
   console.log(`_listing: ${_listing}`);
   console.log(`_stakeholder: ${_stakeholder}`);
-  console.log(`_reward: ${_reward.toString()}`);
+  console.log(`_reward: ${convertBnToDecimal(_reward)}`);
   console.log(`_from: ${_from.toString()}`);
   console.log(`_to: ${_to.toString()}`);
   console.log(`---------END LOGGING Claim--------------`);
@@ -57,7 +57,7 @@ TokenInstance.on('Register', async (_listing: string, _stakeholder: string, _amo
   console.log(`---------BEGIN LOGGING Register--------------`);
   console.log(`_listing: ${_listing}`);
   console.log(`_stakeholder: ${_stakeholder}`);
-  console.log(`_amount: ${_amount.toString()}`);
+  console.log(`_amount: ${convertBnToDecimal(_amount)}`);
   console.log(`_optionId: ${_optionId.toString()}`);
   console.log(`---------END LOGGING Register--------------`);
 });

@@ -9,6 +9,7 @@ import {
   calculateOwnershipExtension,
   calculateAvailableTokenForWithdrawing,
   calculateStakeHolderReward,
+  calNewOwnershipAfterWithdraw,
 } from './utils';
 
 export const v1 = () => {
@@ -545,30 +546,69 @@ export const v1 = () => {
       });
 
       describe('Ownership withdrawal', () => {
+        const withdrawAmount = tokenAmountBN(10_000);
+
         it('Must be the listing owner to withdraw', async () => {
           const listingOwner = await listingInstance.owner();
           expect(listingOwner).equal(listingOwner1.address);
           expect(listingOwner).not.equal(listingOwner2.address);
 
-          await expect(listingInstance.connect(listingOwner2).withdraw()).to.be.revertedWith('Listing: Unauth!');
+          await expect(listingInstance.connect(listingOwner2).withdraw(withdrawAmount)).to.be.revertedWith(
+            'Listing: Unauth!'
+          );
         });
 
         it('Ownership value must not be in the past', async () => {
-          await expect(listingInstance.connect(listingOwner1).withdraw()).to.be.revertedWith(
+          await expect(listingInstance.connect(listingOwner1).withdraw(withdrawAmount)).to.be.revertedWith(
             'Listing: Ownership expired!'
           );
         });
 
-        it('Ownership value will be set to current block timestamp', async () => {
+        it('Ownership value will be recalculated based on withdraw amount', async () => {
+          await listingInstance.connect(listingOwner1).extendOwnership(extensionValues);
+          const intialOwnership = await listingInstance.ownership();
+          const dailyPayment = await listingInstance.dailyPayment();
+          await listingInstance.connect(listingOwner1).withdraw(withdrawAmount);
+          const expectedOwnershipValue = calNewOwnershipAfterWithdraw({
+            withdrawAmount,
+            existingOwnership: intialOwnership,
+            dailyPayment,
+          });
+
+          const newOwnership = await listingInstance.ownership();
+          expect(newOwnership).equal(expectedOwnershipValue);
+
+        });
+  
+        it("Owner cant withdraw more than the credit left",async () => {
           await listingInstance.connect(listingOwner1).extendOwnership(extensionValues);
 
-          const withdrawTx = await listingInstance.connect(listingOwner1).withdraw();
-          const withdrawReceipt = await withdrawTx.wait();
-          const withdrawTS = (await ethers.provider.getBlock(withdrawReceipt.blockNumber)).timestamp;
+          const blockNo_1 = await ethers.provider.getBlockNumber();
+          const blockInfo_1 = await ethers.provider.getBlock(blockNo_1);
+          const blockTS_1 = blockInfo_1.timestamp;
 
-          const listingOwnershipAfterWithdrawing = await listingInstance.ownership();
-          expect(listingOwnershipAfterWithdrawing.toNumber() === withdrawTS);
-        });
+          const listingOwnership_1 = await listingInstance.ownership();
+          const listingDP_1 = await listingInstance.dailyPayment();
+          const maximumTokenToWithdraw_1 = calculateAvailableTokenForWithdrawing({
+            currentBlockTS: BigNumber.from(blockTS_1),
+            existingOwnership: listingOwnership_1,
+            dailyPayment: listingDP_1
+          });
+
+          await expect(listingInstance.connect(listingOwner1).withdraw(maximumTokenToWithdraw_1)).to.be.revertedWith(
+            'Listing: Invalid amount!'
+          );
+
+          const maximumTokenToWithdraw_2 = calculateAvailableTokenForWithdrawing({
+            // // Add 5 more minutes to create a difference
+            currentBlockTS: BigNumber.from(blockTS_1).add(300), 
+            existingOwnership: listingOwnership_1.add(60),
+            dailyPayment: listingDP_1
+          });
+
+          await expect(listingInstance.connect(listingOwner1).withdraw(maximumTokenToWithdraw_2)).to.be.not.reverted;
+
+        })
 
         it('Cant withdraw with insufficient funds balance', async () => {
           await listingInstance.connect(listingOwner1).extendOwnership(extensionValues);
@@ -576,7 +616,7 @@ export const v1 = () => {
           const fundsBalance = await ANFTInstance.balanceOf(stakingAcc.address);
           await ANFTInstance.connect(stakingAcc).transfer(stakingAcc2.address, fundsBalance);
 
-          await expect(listingInstance.connect(listingOwner1).withdraw()).to.be.revertedWith(
+          await expect(listingInstance.connect(listingOwner1).withdraw(withdrawAmount)).to.be.revertedWith(
             'ERC20: transfer amount exceeds balance'
           );
         });
@@ -586,7 +626,6 @@ export const v1 = () => {
           const listingOwnerBal_1 = await ANFTInstance.balanceOf(listingOwner1.address);
 
           await listingInstance.connect(listingOwner1).extendOwnership(extensionValues);
-          const existingOwnership = await listingInstance.ownership();
 
           const stakingBal_2 = await ANFTInstance.balanceOf(stakingAcc.address);
           const listingOwnerBal_2 = await ANFTInstance.balanceOf(listingOwner1.address);
@@ -595,56 +634,45 @@ export const v1 = () => {
 
           expect(listingOwnerBal_1.sub(extensionValues)).equal(listingOwnerBal_2);
 
-          const withdrawTx = listingInstance.connect(listingOwner1).withdraw();
-
-          const withdrawReceipt = await (await withdrawTx).wait();
-          const withdrawTS = (await ethers.provider.getBlock(withdrawReceipt.blockNumber)).timestamp;
-
+          const ownership_1 = await listingInstance.ownership();
           const dailyPayment = await listingInstance.dailyPayment();
 
-          const expectedTokensToReturn = calculateAvailableTokenForWithdrawing({
-            currentBlockTS: BigNumber.from(withdrawTS),
-            existingOwnership,
+          const withdrawTx = listingInstance.connect(listingOwner1).withdraw(withdrawAmount);
+          const expectedOwnershipValue = calNewOwnershipAfterWithdraw({
+            withdrawAmount,
+            existingOwnership: ownership_1,
             dailyPayment,
           });
 
+
           await expect(withdrawTx)
             .to.emit(ANFTInstance, 'Withdraw')
-            .withArgs(listingInstance.address, listingOwner1.address, expectedTokensToReturn);
+            .withArgs(listingInstance.address, listingOwner1.address, withdrawAmount, ownership_1, expectedOwnershipValue);
 
           const stakingBal_3 = await ANFTInstance.balanceOf(stakingAcc.address);
           const listingOwnerBal_3 = await ANFTInstance.balanceOf(listingOwner1.address);
 
-          expect(stakingBal_2.sub(expectedTokensToReturn)).equal(stakingBal_3);
+          expect(stakingBal_2.sub(withdrawAmount)).equal(stakingBal_3);
 
-          expect(listingOwnerBal_2.add(expectedTokensToReturn)).equal(listingOwnerBal_3);
+          expect(listingOwnerBal_2.add(withdrawAmount)).equal(listingOwnerBal_3);
         });
 
         it('rewardPool is updated accordingly when owner extends ownership or withdraw', async () => {
           const rewardPool_1 = await listingInstance.rewardPool();
 
           await listingInstance.connect(listingOwner1).extendOwnership(extensionValues);
-          const existingOwnership = await listingInstance.ownership();
 
           const rewardPool_2 = await listingInstance.rewardPool();
 
           expect(rewardPool_1.add(extensionValues)).equal(rewardPool_2);
 
-          const withdrawTx = await listingInstance.connect(listingOwner1).withdraw();
-          const withdrawReceipt = await withdrawTx.wait();
-          const withdrawTS = (await ethers.provider.getBlock(withdrawReceipt.blockNumber)).timestamp;
+          const withdrawTx = await listingInstance.connect(listingOwner1).withdraw(withdrawAmount);
+          await withdrawTx.wait();
 
-          const dailyPayment = await listingInstance.dailyPayment();
-
-          const expectedTokensToReturn = calculateAvailableTokenForWithdrawing({
-            currentBlockTS: BigNumber.from(withdrawTS),
-            existingOwnership,
-            dailyPayment,
-          });
 
           const rewardPool_3 = await listingInstance.rewardPool();
 
-          expect(rewardPool_2.sub(expectedTokensToReturn)).equal(rewardPool_3);
+          expect(rewardPool_2.sub(withdrawAmount)).equal(rewardPool_3);
         });
 
         it('Owner cant withdraw with inactive listing', async () => {
@@ -658,7 +686,7 @@ export const v1 = () => {
             'Token: Inactive Listing'
           );
 
-          await expect(listingInstance.connect(listingOwner1).withdraw()).to.be.revertedWith('Token: Inactive Listing');
+          await expect(listingInstance.connect(listingOwner1).withdraw(withdrawAmount)).to.be.revertedWith('Token: Inactive Listing');
 
           const rewardPool_2 = await listingInstance.rewardPool();
           const ownership_2 = await listingInstance.ownership();
@@ -1073,8 +1101,6 @@ export const v1 = () => {
         it('A Claim event is emitted', async () => {
           const claimTx = listingInstance.connect(stakeholder1).claimReward(option0);
 
-
-
           const claimReceipt = await (await claimTx).wait();
           const claimTS = (await ethers.provider.getBlock(claimReceipt.blockNumber)).timestamp;
 
@@ -1086,13 +1112,9 @@ export const v1 = () => {
             blockTS: BigNumber.from(claimTS),
           });
 
-          await expect(claimTx).to.emit(ANFTInstance, 'Claim').withArgs(
-            listingInstance.address,
-            stakeholder1.address,
-            expectedReward,
-            stakeStart,
-            claimTS
-          );
+          await expect(claimTx)
+            .to.emit(ANFTInstance, 'Claim')
+            .withArgs(listingInstance.address, stakeholder1.address, expectedReward, stakeStart, claimTS);
         });
       });
     });
@@ -1267,38 +1289,75 @@ export const v1 = () => {
         });
 
         describe('Ownership withdrawal', () => {
+          const withdrawAmount = tokenAmountBN(10_000);
           it('Must be the listing owner to withdraw', async () => {
             const listingOwner = await listingInstance.owner();
             expect(listingOwner).equal(listingOwner1.address);
             expect(listingOwner).not.equal(listingOwner2.address);
 
-            await expect(listingInstance.connect(listingOwner2).withdraw()).to.be.revertedWith('Listing: Unauth!');
+            await expect(listingInstance.connect(listingOwner2).withdraw(withdrawAmount)).to.be.revertedWith('Listing: Unauth!');
           });
 
           it('Ownership value must not be in the past', async () => {
-            await expect(listingInstance.connect(listingOwner1).withdraw()).to.be.revertedWith(
+            await expect(listingInstance.connect(listingOwner1).withdraw(withdrawAmount)).to.be.revertedWith(
               'Listing: Ownership expired!'
             );
           });
 
-          it('Ownership value will be set to current block timestamp', async () => {
+          it('Ownership value will be recalculated based on withdraw amount', async () => {
             await listingInstance.connect(listingOwner1).extendOwnership(extensionValues);
-
-            const withdrawTx = await listingInstance.connect(listingOwner1).withdraw();
-            const withdrawReceipt = await withdrawTx.wait();
-            const withdrawTS = (await ethers.provider.getBlock(withdrawReceipt.blockNumber)).timestamp;
-
-            const listingOwnershipAfterWithdrawing = await listingInstance.ownership();
-            expect(listingOwnershipAfterWithdrawing.toNumber() === withdrawTS);
+            const intialOwnership = await listingInstance.ownership();
+            const dailyPayment = await listingInstance.dailyPayment();
+            await listingInstance.connect(listingOwner1).withdraw(withdrawAmount);
+            const expectedOwnershipValue = calNewOwnershipAfterWithdraw({
+              withdrawAmount,
+              existingOwnership: intialOwnership,
+              dailyPayment,
+            });
+  
+            const newOwnership = await listingInstance.ownership();
+            expect(newOwnership).equal(expectedOwnershipValue);
+  
           });
+
+          it("Owner cant withdraw more than the credit left",async () => {
+            await listingInstance.connect(listingOwner1).extendOwnership(extensionValues);
+  
+            const blockNo_1 = await ethers.provider.getBlockNumber();
+            const blockInfo_1 = await ethers.provider.getBlock(blockNo_1);
+            const blockTS_1 = blockInfo_1.timestamp;
+  
+            const listingOwnership_1 = await listingInstance.ownership();
+            const listingDP_1 = await listingInstance.dailyPayment();
+            const maximumTokenToWithdraw_1 = calculateAvailableTokenForWithdrawing({
+              currentBlockTS: BigNumber.from(blockTS_1),
+              existingOwnership: listingOwnership_1,
+              dailyPayment: listingDP_1
+            });
+  
+            await expect(listingInstance.connect(listingOwner1).withdraw(maximumTokenToWithdraw_1)).to.be.revertedWith(
+              'Listing: Invalid amount!'
+            );
+  
+            const maximumTokenToWithdraw_2 = calculateAvailableTokenForWithdrawing({
+              // // Add 5 more minutes to create a difference
+              currentBlockTS: BigNumber.from(blockTS_1).add(300), 
+              existingOwnership: listingOwnership_1.add(60),
+              dailyPayment: listingDP_1
+            });
+  
+            await expect(listingInstance.connect(listingOwner1).withdraw(maximumTokenToWithdraw_2)).to.be.not.reverted;
+  
+          })
+
 
           it('Cant withdraw with insufficient funds balance', async () => {
             await listingInstance.connect(listingOwner1).extendOwnership(extensionValues);
-
+  
             const fundsBalance = await upgradeInstance.balanceOf(stakingAcc.address);
             await upgradeInstance.connect(stakingAcc).transfer(stakingAcc2.address, fundsBalance);
-
-            await expect(listingInstance.connect(listingOwner1).withdraw()).to.be.revertedWith(
+  
+            await expect(listingInstance.connect(listingOwner1).withdraw(withdrawAmount)).to.be.revertedWith(
               'ERC20: transfer amount exceeds balance'
             );
           });
@@ -1306,42 +1365,37 @@ export const v1 = () => {
           it('Value will be transfered back, from Staking Address to Owner', async () => {
             const stakingBal_1 = await upgradeInstance.balanceOf(stakingAcc.address);
             const listingOwnerBal_1 = await upgradeInstance.balanceOf(listingOwner1.address);
-
+  
             await listingInstance.connect(listingOwner1).extendOwnership(extensionValues);
-            const existingOwnership = await listingInstance.ownership();
-
+  
             const stakingBal_2 = await upgradeInstance.balanceOf(stakingAcc.address);
             const listingOwnerBal_2 = await upgradeInstance.balanceOf(listingOwner1.address);
-
+  
             expect(stakingBal_1.add(extensionValues)).equal(stakingBal_2);
-
+  
             expect(listingOwnerBal_1.sub(extensionValues)).equal(listingOwnerBal_2);
-
-            const withdrawTx = listingInstance.connect(listingOwner1).withdraw();
-    
-            const withdrawReceipt = await (await withdrawTx).wait();
-            const withdrawTS = (await ethers.provider.getBlock(withdrawReceipt.blockNumber)).timestamp;
-
+  
+            const ownership_1 = await listingInstance.ownership();
             const dailyPayment = await listingInstance.dailyPayment();
-
-            const expectedTokensToReturn = calculateAvailableTokenForWithdrawing({
-              currentBlockTS: BigNumber.from(withdrawTS),
-              existingOwnership,
+  
+            const withdrawTx = listingInstance.connect(listingOwner1).withdraw(withdrawAmount);
+            const expectedOwnershipValue = calNewOwnershipAfterWithdraw({
+              withdrawAmount,
+              existingOwnership: ownership_1,
               dailyPayment,
             });
-
-            await expect(withdrawTx).to.emit(upgradeInstance, 'Withdraw').withArgs(
-              listingInstance.address,
-              listingOwner1.address,
-              expectedTokensToReturn
-            );
-
+  
+  
+            await expect(withdrawTx)
+              .to.emit(upgradeInstance, 'Withdraw')
+              .withArgs(listingInstance.address, listingOwner1.address, withdrawAmount, ownership_1, expectedOwnershipValue);
+  
             const stakingBal_3 = await upgradeInstance.balanceOf(stakingAcc.address);
             const listingOwnerBal_3 = await upgradeInstance.balanceOf(listingOwner1.address);
-
-            expect(stakingBal_2.sub(expectedTokensToReturn)).equal(stakingBal_3);
-
-            expect(listingOwnerBal_2.add(expectedTokensToReturn)).equal(listingOwnerBal_3);
+  
+            expect(stakingBal_2.sub(withdrawAmount)).equal(stakingBal_3);
+  
+            expect(listingOwnerBal_2.add(withdrawAmount)).equal(listingOwnerBal_3);
           });
 
           it('Owner cant withdraw with inactive listing', async () => {
@@ -1355,7 +1409,7 @@ export const v1 = () => {
               'Token: Inactive Listing'
             );
 
-            await expect(listingInstance.connect(listingOwner1).withdraw()).to.be.revertedWith(
+            await expect(listingInstance.connect(listingOwner1).withdraw(withdrawAmount)).to.be.revertedWith(
               'Token: Inactive Listing'
             );
 
@@ -1539,4 +1593,4 @@ export const v1 = () => {
       });
     });
   });
-};
+}

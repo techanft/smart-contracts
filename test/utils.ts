@@ -53,6 +53,24 @@ export const calculateAvailableTokenForWithdrawing = ({
   return valueToReturn;
 };
 
+interface ICalNewOwnershipAfterWithdraw {
+  withdrawAmount: BigNumber;
+  existingOwnership: BigNumber;
+  dailyPayment: BigNumber;
+}
+
+export const calNewOwnershipAfterWithdraw = ({
+  withdrawAmount,
+  existingOwnership,
+  dailyPayment,
+}: ICalNewOwnershipAfterWithdraw) => {
+
+  const removedCreditTimestamp = withdrawAmount.mul(86400).div(dailyPayment);
+  const newOwnership = existingOwnership.sub(removedCreditTimestamp);
+
+  return newOwnership;
+};
+
 interface ICalSHReward {
   instance: Listing;
   optionId: number;

@@ -206,23 +206,30 @@ contract Listing is ListingStorage {
     * Both listing total stake and option total stake is increased/decreased by `_amount`, according to the `_increase` flag
     * Emits an {Register} event
     */
-    function register (uint256 _amount, uint256 _optionId, bool _increase) public onlyActiveListing {
+    function register (uint256 _amount, uint256 _optionId) public onlyActiveListing {
         require(options[_optionId]._isSet, "Listing: Option not available");
+
+        StakingModel storage chosenStake = stakings[_optionId][msg.sender];
+        require(_amount != chosenStake._amount, "Listing: Stake unchanged!");
+
         uint256 callerBalance = Token(tokenContract).balanceOf(msg.sender);
+        require(callerBalance >= callerBalance, "Listing: Insufficient balance!");
 
-        StakingModel storage userStake = stakings[_optionId][msg.sender];
+        bool stakeIncreased = _amount > chosenStake._amount;
+        uint256 difference = stakeIncreased ? _amount.sub(chosenStake._amount) : chosenStake._amount.sub(_amount);
 
-        uint256 amountToCompareAgainst = _increase ? userStake._amount.add(_amount) : userStake._amount.sub(_amount);
-        require(callerBalance >= amountToCompareAgainst, "Listing: Insufficient balance!");
+        if (stakeIncreased) {
+            chosenStake._amount = chosenStake._amount.add(difference);
+            options[_optionId]._totalStake = options[_optionId]._totalStake.add(difference);
+            totalStake = totalStake.add(difference);
+        } else {
+            chosenStake._amount = chosenStake._amount.sub(difference);
+            options[_optionId]._totalStake = options[_optionId]._totalStake.sub(difference);
+            totalStake = totalStake.sub(difference);
+        }
 
-        userStake._amount = _increase ? userStake._amount.add(_amount) : userStake._amount.sub(_amount);
-        userStake._start = block.timestamp;
-        userStake._active = true;
-
-        options[_optionId]._totalStake = _increase ? options[_optionId]._totalStake.add(_amount) : options[_optionId]._totalStake.sub(_amount);
-  
-        totalStake = _increase ? totalStake.add(_amount) : totalStake.sub(_amount);
-
+        chosenStake._start = block.timestamp;
+        chosenStake._active = true;
         Token(tokenContract).triggerRegisterEvent(msg.sender, _amount, _optionId);
     }
     /**

@@ -42,7 +42,6 @@ const register = async () => {
     console.log(`listingTotalStakeBefore: ${convertBnToDecimal(listingTotalStakeBefore)}`);
     
     const tx = await contractWithSigner.register()
-
 }
 
 const main = async () => {

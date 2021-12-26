@@ -732,102 +732,22 @@ export const v1 = () => {
           const randomOption = 6;
 
           await expect(
-            listingInstance.connect(stakeholder1).register(registeredAmount, randomOption, true)
+            listingInstance.connect(stakeholder1).register(registeredAmount, randomOption)
           ).to.be.revertedWith('Listing: Option not available');
-          await expect(listingInstance.connect(stakeholder1).register(registeredAmount, option0, true)).to.be.not
-            .reverted;
+          await expect(listingInstance.connect(stakeholder1).register(registeredAmount, option0)).to.be.not.reverted;
         });
 
-        it('If {_increase} is marked as true, user balance must gte {_amount} + {_userCurrentStake}', async () => {
-          const userBalance = await ANFTInstance.balanceOf(stakeholder1.address);
-          await expect(
-            listingInstance.connect(stakeholder1).register(userBalance.add(1), option0, true)
-          ).to.be.revertedWith('Listing: Insufficient balance!');
-          await expect(
-            listingInstance.connect(stakeholder1).register(userBalance, option0, true)
-          ).to.be.not.reverted;
-          await expect(
-            listingInstance.connect(stakeholder1).register(BigNumber.from(1), option0, true)
-          ).to.be.revertedWith('Listing: Insufficient balance!');
+        // cant register with same amount
 
-          const transferedAmount = tokenAmountBN(100);
-          await ANFTInstance.transfer(stakeholder1.address, transferedAmount);
-
-          await expect(
-            listingInstance.connect(stakeholder1).register(transferedAmount, option0, true)
-          ).to.be.not.reverted;
-          await expect(
-            listingInstance.connect(stakeholder1).register(BigNumber.from(1), option0, true)
-          ).to.be.revertedWith('Listing: Insufficient balance!');
-        });
-
-        it('If {_increase} is marked as false, user balance must gte {_userCurrentStake} - {_amount}', async () => {
-          await listingInstance.connect(stakeholder1).register(registeredAmount, option0, true);
-          const currentUserStake = await listingInstance.stakings(option0, stakeholder1.address); // 100_000
-          
-          const shBal_1 = await ANFTInstance.balanceOf(stakeholder1.address);
-          const amountToRemove = tokenAmountBN(30_000);
-          const amountToTransferAway = currentUserStake._amount.sub(amountToRemove); 
-          await ANFTInstance.connect(stakeholder1).transfer(stakeholder2.address, shBal_1); 
-          await ANFTInstance.transfer(stakeholder1.address, amountToTransferAway); 
-
-
-          await expect(
-            listingInstance.connect(stakeholder1).register(amountToRemove.sub(tokenAmountBN(1)), option0, false)
-          ).to.be.revertedWith('Listing: Insufficient balance!');
-
-          await expect(
-            listingInstance.connect(stakeholder1).register(amountToRemove, option0, false)
-          ).to.be.not.revertedWith('Listing: Insufficient balance!');
-
-
-        });
-
-        it('User can decrease the staking amount by setting _increase as false', async () => {
-          const stakingRecord_1 = await listingInstance.stakings(option0, stakeholder1.address);
-
-          await listingInstance.connect(stakeholder1).register(registeredAmount, option0, true);
-
-          const stakingRecord_2 = await listingInstance.stakings(option0, stakeholder1.address);
-
-          expect(stakingRecord_1._amount).equal(stakingRecord_2._amount.sub(registeredAmount));
-
-          await expect(listingInstance.connect(stakeholder1).register(stakingRecord_2._amount.add(1), option0, false))
-            .to.be.reverted;
-
-          await expect(listingInstance.connect(stakeholder1).register(stakingRecord_2._amount.div(2), option0, false))
-            .to.be.not.reverted;
-
-          const stakingRecord_3 = await listingInstance.stakings(option0, stakeholder1.address);
-          expect(stakingRecord_3._amount).equal(stakingRecord_2._amount.sub(stakingRecord_2._amount.div(2)));
-        });
-
-        it('Staking info is updated when user register', async () => {
-          const stakingRecord_1 = await listingInstance.stakings(option0, stakeholder1.address);
-          expect(!stakingRecord_1._active);
-
-          const optionInfo = await listingInstance.options(option0);
-          expect(optionInfo._reward.toNumber()).equal(option0Reward);
-
-          const registerTx = await listingInstance.connect(stakeholder1).register(registeredAmount, option0, true);
-          const registerReceipt = await registerTx.wait();
-          const registerTS = (await ethers.provider.getBlock(registerReceipt.blockNumber)).timestamp;
-
-          const stakingRecord_2 = await listingInstance.stakings(option0, stakeholder1.address);
-
-          expect(stakingRecord_2._amount).equal(registeredAmount);
-          expect(stakingRecord_2._start.toNumber()).equal(registerTS);
-          expect(stakingRecord_1._active);
-        });
-
-        it("Option's pool stake, user's stake, totalStake is increased and decreased according to the {_increase} flag", async () => {
+        it("Option's pool stake, user's stake, totalStake is increased when register amount > currentStake.amount", async () => {
           const totalStake_1 = await listingInstance.totalStake();
           const { _totalStake: totalPoolStake_1 } = await listingInstance.options(option0);
           const stakingRecord_1 = await listingInstance.stakings(option0, stakeholder1.address);
 
-          // Increase = true
+          expect(registeredAmount.gt(stakingRecord_1._amount)).true;
+          expect(registeredAmount.lt(stakingRecord_1._amount)).false;
 
-          await listingInstance.connect(stakeholder1).register(registeredAmount, option0, true);
+          await listingInstance.connect(stakeholder1).register(registeredAmount, option0);
 
           const totalStake_2 = await listingInstance.totalStake();
           const { _totalStake: totalPoolStake_2 } = await listingInstance.options(option0);
@@ -836,67 +756,38 @@ export const v1 = () => {
           expect(totalStake_1).equal(totalStake_2.sub(registeredAmount));
           expect(totalPoolStake_1).equal(totalPoolStake_2.sub(registeredAmount));
           expect(stakingRecord_1._amount).equal(stakingRecord_2._amount.sub(registeredAmount));
-
-          // Increase = false
-          await listingInstance.connect(stakeholder1).register(registeredAmount, option0, false);
-
-          const totalStake_3 = await listingInstance.totalStake();
-          const { _totalStake: totalPoolStake_3 } = await listingInstance.options(option0);
-          const stakingRecord_3 = await listingInstance.stakings(option0, stakeholder1.address);
-
-          expect(totalStake_2).equal(totalStake_3.add(registeredAmount));
-          expect(totalPoolStake_2).equal(totalPoolStake_3.add(registeredAmount));
-          expect(stakingRecord_2._amount).equal(stakingRecord_3._amount.add(registeredAmount));
         });
 
-        it('Option pool is updated by registered amount', async () => {
-          const { _totalStake: totalPoolStake_1 } = await listingInstance.options(option0);
-          await listingInstance.connect(stakeholder1).register(registeredAmount, option0, true);
-          const { _totalStake: totalPoolStake_2 } = await listingInstance.options(option0);
-          expect(totalPoolStake_1.add(registeredAmount)).equal(totalPoolStake_2);
-          await listingInstance.connect(stakeholder2).register(registeredAmount.mul(2), option0, true);
-          const { _totalStake: totalPoolStake_3 } = await listingInstance.options(option0);
-          expect(totalPoolStake_2.add(registeredAmount.mul(2))).equal(totalPoolStake_3);
-        });
+        it("Option's pool stake, user's stake, totalStake is increased when register amount > currentStake.amount", async () => {
+          await listingInstance.connect(stakeholder1).register(registeredAmount, option0);
 
-        it('Listing totalStake is increased by registered amount', async () => {
           const totalStake_1 = await listingInstance.totalStake();
-          await listingInstance.connect(stakeholder1).register(registeredAmount, option0, true);
+          const { _totalStake: totalPoolStake_1 } = await listingInstance.options(option0);
+          const stakingRecord_1 = await listingInstance.stakings(option0, stakeholder1.address);
+
+          const newRegisterAmount = registeredAmount.div(2);
+          expect(newRegisterAmount.gt(stakingRecord_1._amount)).false;
+          expect(newRegisterAmount.lt(stakingRecord_1._amount)).true;
+
+          await listingInstance.connect(stakeholder1).register(newRegisterAmount, option0);
+
           const totalStake_2 = await listingInstance.totalStake();
-          expect(totalStake_1.add(registeredAmount)).equal(totalStake_2);
-          await listingInstance.connect(stakeholder2).register(registeredAmount.mul(2), option0, true);
-          const totalStake_3 = await listingInstance.totalStake();
-          expect(totalStake_2.add(registeredAmount.mul(2))).equal(totalStake_3);
-        });
+          const { _totalStake: totalPoolStake_2 } = await listingInstance.options(option0);
+          const stakingRecord_2 = await listingInstance.stakings(option0, stakeholder1.address);
 
-        it('Register event is emitted', async () => {
-          const registerPromise = listingInstance.connect(stakeholder1).register(registeredAmount, option0, true);
-          await expect(registerPromise)
-            .to.emit(ANFTInstance, 'Register')
-            .withArgs(listingInstance.address, stakeholder1.address, registeredAmount, option0);
-        });
-
-        it('Staking amount is added on top of the previous stake', async () => {
-          const { _totalStake: poolStake_1 } = await listingInstance.options(option0);
-
-          await listingInstance.connect(stakeholder1).register(registeredAmount, option0, true);
-          const { _totalStake: poolStake_2 } = await listingInstance.options(option0);
-          expect(poolStake_1.add(registeredAmount)).equal(poolStake_2);
-
-          await listingInstance.connect(stakeholder1).register(registeredAmount.mul(2), option0, true);
-          const { _totalStake: poolStake_3 } = await listingInstance.options(option0);
-          expect(poolStake_2.add(registeredAmount.mul(2))).equal(poolStake_3);
+          expect(totalStake_1).equal(totalStake_2.add(newRegisterAmount));
+          expect(totalPoolStake_1).equal(totalPoolStake_2.add(newRegisterAmount));
+          expect(stakingRecord_1._amount).equal(stakingRecord_2._amount.add(newRegisterAmount));
         });
 
         it('User cant register for inactive listing', async () => {
-          await expect(listingInstance.connect(stakeholder1).register(registeredAmount, option0, true)).to.be.not
-            .reverted;
+          await expect(listingInstance.connect(stakeholder1).register(registeredAmount, option0)).to.be.not.reverted;
 
           await ANFTInstance.connect(validator).toggleListingStatus(listingAddress);
 
-          await expect(
-            listingInstance.connect(stakeholder2).register(registeredAmount, option0, true)
-          ).to.be.revertedWith('Listing: Inactive listing!');
+          await expect(listingInstance.connect(stakeholder2).register(registeredAmount, option0)).to.be.revertedWith(
+            'Listing: Inactive listing!'
+          );
         });
       });
 
@@ -904,7 +795,7 @@ export const v1 = () => {
         const registeredAmount = tokenAmountBN(100_000);
         const option0 = 0;
         beforeEach(async () => {
-          await listingInstance.connect(stakeholder1).register(registeredAmount, option0, true);
+          await listingInstance.connect(stakeholder1).register(registeredAmount, option0);
         });
 
         it('User must register first', async () => {
@@ -968,7 +859,7 @@ export const v1 = () => {
 
         beforeEach(async () => {
           await listingInstance.connect(listingOwner1).extendOwnership(ownershipExtension);
-          await listingInstance.connect(stakeholder1).register(registeredAmount, option0, true);
+          await listingInstance.connect(stakeholder1).register(registeredAmount, option0);
           const { _start } = await listingInstance.stakings(option0, stakeholder1.address);
           stakeStart = _start;
         });
@@ -1004,19 +895,18 @@ export const v1 = () => {
 
         it('Maximum T is 86% for unforfeited listing', async () => {
           const listingValue_1 = await listingInstance.value();
-          const totalStake_1 = await listingInstance.totalStake();
-
-          // Ensure total stake is equal to listing instance
-          await listingInstance.connect(stakeholder1).register(listingValue_1.sub(totalStake_1), option0, true);
+          // Ensure total stake is equal to listing value
+          await listingInstance.connect(stakeholder1).register(listingValue_1, option0);
 
           await ethers.provider.send('evm_increaseTime', [86400 * 2]);
           await ethers.provider.send('evm_mine', []);
-          const { _start: stakeStart } = await listingInstance.stakings(option0, stakeholder1.address);
 
           const listingValue_2 = await listingInstance.value();
           const totalStake_2 = await listingInstance.totalStake();
 
           expect(listingValue_2).equal(totalStake_2);
+
+          const { _start: stakeStart } = await listingInstance.stakings(option0, stakeholder1.address);
 
           const SABal_1 = await ANFTInstance.balanceOf(stakingAcc.address);
           const SHBal_1 = await ANFTInstance.balanceOf(stakeholder1.address);
@@ -1045,7 +935,7 @@ export const v1 = () => {
           const totalStake_1 = await listingInstance.totalStake();
 
           // Ensure total stake is equal to listing instance
-          await listingInstance.connect(stakeholder2).register(listingValue_1.sub(totalStake_1), option0, true);
+          await listingInstance.connect(stakeholder2).register(listingValue_1.sub(totalStake_1), option0);
 
           const initialListingTS = await listingInstance.ownership();
 
@@ -1501,7 +1391,7 @@ export const v1 = () => {
 
           beforeEach(async () => {
             await listingInstance.connect(listingOwner1).extendOwnership(ownershipExtension);
-            await listingInstance.connect(stakeholder1).register(registeredAmount, option0, true);
+            await listingInstance.connect(stakeholder1).register(registeredAmount, option0);
             const { _start } = await listingInstance.stakings(option0, stakeholder1.address);
             stakeStart = _start;
           });
@@ -1537,19 +1427,18 @@ export const v1 = () => {
 
           it('Maximum T is 86% for unforfeited listing', async () => {
             const listingValue_1 = await listingInstance.value();
-            const totalStake_1 = await listingInstance.totalStake();
-
-            // Ensure total stake is equal to listing instance
-            await listingInstance.connect(stakeholder1).register(listingValue_1.sub(totalStake_1), option0, true);
+            // Ensure total stake is equal to listing value
+            await listingInstance.connect(stakeholder1).register(listingValue_1, option0);
 
             await ethers.provider.send('evm_increaseTime', [86400 * 2]);
             await ethers.provider.send('evm_mine', []);
-            const { _start: stakeStart } = await listingInstance.stakings(option0, stakeholder1.address);
 
             const listingValue_2 = await listingInstance.value();
             const totalStake_2 = await listingInstance.totalStake();
 
             expect(listingValue_2).equal(totalStake_2);
+
+            const { _start: stakeStart } = await listingInstance.stakings(option0, stakeholder1.address);
 
             const SABal_1 = await upgradeInstance.balanceOf(stakingAcc.address);
             const SHBal_1 = await upgradeInstance.balanceOf(stakeholder1.address);
@@ -1572,13 +1461,12 @@ export const v1 = () => {
             expect(SABal_2).equal(SABal_1.sub(expectedReward));
             expect(SHBal_2).equal(SHBal_1.add(expectedReward));
           });
-
           it('Maximum T is 50% for forfeited listing', async () => {
             const listingValue_1 = await listingInstance.value();
             const totalStake_1 = await listingInstance.totalStake();
 
             // Ensure total stake is equal to listing instance
-            await listingInstance.connect(stakeholder2).register(listingValue_1.sub(totalStake_1), option0, true);
+            await listingInstance.connect(stakeholder2).register(listingValue_1.sub(totalStake_1), option0);
 
             const initialListingTS = await listingInstance.ownership();
 

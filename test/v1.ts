@@ -448,7 +448,8 @@ export const v1 = () => {
               listingOwner1.address,
               listingOwner1.address,
               expectedStart,
-              expectedEnd
+              expectedEnd, 
+              extensionValues
             );
         });
 

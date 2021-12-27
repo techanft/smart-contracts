@@ -1,8 +1,6 @@
 import { BigNumber, ethers } from 'ethers';
 import provider from './provider';
 
-
-
 export const convertBnToDecimal = (input: BigNumber) => {
   return ethers.utils.formatEther(input.toString());
 };
@@ -34,9 +32,9 @@ export const randomizeArray = () => {
   return output;
 };
 
-export const getWalletByPK = (PK :string ) => {
+export const getWalletByPK = (PK: string) => {
   return new ethers.Wallet(PK, provider);
-}
+};
 export const listingAddrs = [
   '0xf1f9255c9e7700C2b16BE349Bc347bB45769484f',
   '0xc15a2183C880c0Ad9CCb832127c5e5D14368D36F',

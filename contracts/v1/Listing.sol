@@ -119,7 +119,7 @@ contract Listing is ListingStorage {
         rewardPool = rewardPool.add(_amount);
         
         ownership = existingOwnership.add(_amount.mul(86400).div(dailyPayment));
-        Token(tokenContract).triggerOwnershipExtensionEvent(existingOwner, owner, existingOwnership, ownership);
+        Token(tokenContract).triggerOwnershipExtensionEvent(existingOwner, owner, existingOwnership, ownership, _amount);
     }
 
     /**

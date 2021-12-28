@@ -4,7 +4,7 @@ import provider from './BO/provider';
 import { getWalletByPK } from '../utils';
 import { convertBnToDecimal, convertDecimalToBn, listingAddrs } from './BO/utils';
 
-const [first, second, third, fourth, fifth] = listingAddrs;
+const [first, second, third, fourth, fifth, sixth] = listingAddrs;
 
 const { OWNER_PK } = process.env;
 const { STAKEHOLDER_PK } = process.env;
@@ -12,13 +12,13 @@ const { STAKEHOLDER_PK } = process.env;
 const ownerWallet = getWalletByPK(OWNER_PK as string);
 const shWallet = getWalletByPK(STAKEHOLDER_PK as string);
 
-const listingInstance = new ethers.Contract(first, listingArtifact.abi, provider);
+const listingInstance = new ethers.Contract(sixth, listingArtifact.abi, provider);
 
 const extendOwnership = async () => {
   const contractWithSigner = listingInstance.connect(ownerWallet);
-  const extendingValue = convertDecimalToBn(String(3840));
   const dailyPayment = await contractWithSigner.dailyPayment();
   console.log(`Daily Payment: ${convertBnToDecimal(dailyPayment)}`);
+  const extendingValue = convertDecimalToBn(String(4480));
   const tx = await contractWithSigner.extendOwnership(extendingValue);
   await tx.wait();
   console.log(tx.hash);
@@ -26,7 +26,7 @@ const extendOwnership = async () => {
 
 const withdraw = async () => {
   const contractWithSigner = listingInstance.connect(ownerWallet);
-  const withdraw = convertDecimalToBn(String(800));
+  const withdraw = convertDecimalToBn(String(4400));
   const tx = await contractWithSigner.withdraw(withdraw);
   await tx.wait();
   console.log(tx.hash);

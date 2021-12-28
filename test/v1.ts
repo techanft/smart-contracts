@@ -719,6 +719,14 @@ export const v1 = () => {
           expect(optionStatus_2._isSet);
           expect(optionStatus_2._reward).equal(BigNumber.from(optionReward));
         });
+        
+        it("Users cant register more than their token balance",async () => {
+          const userBalance = await ANFTInstance.balanceOf(stakeholder1.address);
+          await expect(
+            listingInstance.connect(stakeholder1).register(userBalance.add(1), option0)
+          ).to.be.revertedWith('Listing: Insufficient balance!');
+          await expect(listingInstance.connect(stakeholder1).register(userBalance, option0)).to.be.not.reverted;
+        })
 
         it('Option reward value can not exceed 100', async () => {
           const optionId = 1;
@@ -738,7 +746,6 @@ export const v1 = () => {
           await expect(listingInstance.connect(stakeholder1).register(registeredAmount, option0)).to.be.not.reverted;
         });
 
-        // cant register with same amount
 
         it("Option's pool stake, user's stake, totalStake is increased when register amount > currentStake.amount", async () => {
           const totalStake_1 = await listingInstance.totalStake();

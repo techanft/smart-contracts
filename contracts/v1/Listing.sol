@@ -213,7 +213,7 @@ contract Listing is ListingStorage {
         require(_amount != chosenStake._amount, "Listing: Stake unchanged!");
 
         uint256 callerBalance = Token(tokenContract).balanceOf(msg.sender);
-        require(callerBalance >= callerBalance, "Listing: Insufficient balance!");
+        require(callerBalance >= _amount, "Listing: Insufficient balance!");
 
         bool stakeIncreased = _amount > chosenStake._amount;
         uint256 difference = stakeIncreased ? _amount.sub(chosenStake._amount) : chosenStake._amount.sub(_amount);

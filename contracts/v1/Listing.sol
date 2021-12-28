@@ -280,7 +280,7 @@ contract Listing is ListingStorage {
     *   At(tokens): The total staked amount for an option from ALL stakeholders
     *   Ax(tokens): The staked amount for an option from the calling stakeholder (msg.sender)
     *   Ar(tokens): Available daily tokens for claiming for ONE stakeholder for one option
-    *   Sd(days)  : Staked days
+    *   Sd(seconds): Staked time (difference in stake start and block.timestamp)
     *   Rm(tokens): The reward for a stakeholder after a period of time
     */
     function calculateStakeholderReward (uint256 _optionId, StakingModel storage _userStake) private view returns (uint256) {
@@ -299,9 +299,10 @@ contract Listing is ListingStorage {
 
         uint256 Ar = (RTd.mul(optionInfo._reward).div(100)).mul(_userStake._amount).div(optionInfo._totalStake);
 
-        uint256 Sd = (block.timestamp - _userStake._start) / 86400;
+        uint256 Sd = block.timestamp.sub(_userStake._start);
 
-        return Ar.mul(Sd);
+        return (Ar.mul(Sd)).div(86400);
+        
     }
 
     /**

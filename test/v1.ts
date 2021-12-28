@@ -726,6 +726,7 @@ export const v1 = () => {
             listingInstance.connect(stakeholder1).register(userBalance.add(1), option0)
           ).to.be.revertedWith('Listing: Insufficient balance!');
           await expect(listingInstance.connect(stakeholder1).register(userBalance, option0)).to.be.not.reverted;
+          await expect(listingInstance.connect(stakeholder1).register(userBalance, option0)).to.be.revertedWith("Listing: Stake unchanged!");
         })
 
         it('Option reward value can not exceed 100', async () => {

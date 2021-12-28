@@ -1,6 +1,7 @@
 import { BigNumber } from 'ethers';
 import { Listing } from '../typechain';
 import { Event } from '@ethersproject/contracts';
+import { convertBnToDecimal } from '../scripts/BO/utils';
 
 export const litingAddrFromListingCreationEvent = (events: Event[] | undefined): string => {
   const ListingCreatedEvent = events?.find(({ event }) => event == 'ListingCreation');
@@ -111,10 +112,16 @@ export const calculateStakeHolderReward = async ({
   const above = RTd.mul(optionInfo._reward.toNumber()).div(100);
   const At = optionInfo._totalStake;
   const Ax = userStake._amount;
-
+  
   const Ar = above.mul(Ax).div(At);
-  const stakedDays = blockTS.sub(stakeStart).div(86400);
 
-  const amountToReturn = Ar.mul(stakedDays);
+  const Sd = blockTS.sub(stakeStart);
+
+  const amountToReturn = (Ar.mul(Sd)).div(86400);
+
   return amountToReturn;
 };
+
+export const getCurrentUnix = () => {
+  return Math.round(+new Date()/1000);
+}

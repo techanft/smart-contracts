@@ -1,8 +1,12 @@
 import { getWalletByPK } from '../utils';
 import { TokenInstance } from './BO/grantValidatorRole';
-import { convertDecimalToBn } from './BO/utils';
+import { convertBnToDecimal, convertDecimalToBn } from './BO/utils';
 
 const { TESTNET_DEPLOYER_PRIVATE_KEY } = process.env;
+const { STAKEHOLDER_PK } = process.env;
+
+const shWallet = getWalletByPK(STAKEHOLDER_PK as string);
+
 const transferToken = async () => {
   const accounts = [
     '0x2f09Feb7882fAA415604D179c7d4d12205246854',
@@ -24,13 +28,19 @@ const transferToken = async () => {
     const element = accounts[index];
     const tx = await contractWithSigner.transfer(element, transferAmount);
     await tx.wait();
-    console.log(tx.hash)
-    console.log("-------------------")
+    console.log(tx.hash);
+    console.log('-------------------');
   }
 };
 
+const checkBalance = async () => {
+  const shBal = await TokenInstance.balanceOf(shWallet.address);
+  console.log(`shBal: ${convertBnToDecimal(shBal)}`);
+};
+
 const main = async () => {
-  await transferToken();
+  await checkBalance();
+  // await transferToken();
 };
 
 main().catch((error) => {

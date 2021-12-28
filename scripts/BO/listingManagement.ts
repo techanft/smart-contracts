@@ -105,7 +105,6 @@ const massUpdateListingOptions = async () => {
     console.log(`=============================`);
 
   }
-
 }
 
 const main = async () => {

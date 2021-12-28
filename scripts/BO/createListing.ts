@@ -32,5 +32,6 @@ const main = async () => {
   await createListing(8, owner);
   await createListing(9, owner);
   await createListing(10, owner);
+  await createListing(11, owner);
 };
 main();

@@ -109,7 +109,7 @@ const massUpdateListingOptions = async () => {
 }
 
 const main = async () => {
-  // await massUpdateDPandValue();
+  await massUpdateDPandValue();
   await massUpdateListingOptions();
 }
 main().catch((error) => {

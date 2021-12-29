@@ -39,8 +39,8 @@ const checkBalance = async () => {
 };
 
 const main = async () => {
-  await checkBalance();
-  // await transferToken();
+  // await checkBalance();
+  await transferToken();
 };
 
 main().catch((error) => {

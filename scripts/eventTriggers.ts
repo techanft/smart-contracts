@@ -20,7 +20,7 @@ const extendOwnership = async () => {
   const contractWithSigner = listingInstance.connect(ownerWallet);
   const dailyPayment = await contractWithSigner.dailyPayment();
   console.log(`Daily Payment: ${convertBnToDecimal(dailyPayment)}`);
-  const extendingValue = convertDecimalToBn(String(310));
+  const extendingValue = convertDecimalToBn(String(500));
   const tx = await contractWithSigner.extendOwnership(extendingValue);
   await tx.wait();
   console.log(tx.hash);
@@ -28,7 +28,7 @@ const extendOwnership = async () => {
 
 const withdraw = async () => {
   const contractWithSigner = listingInstance.connect(ownerWallet);
-  const withdraw = convertDecimalToBn(String(300));
+  const withdraw = convertDecimalToBn(String(200));
   const tx = await contractWithSigner.withdraw(withdraw);
   await tx.wait();
   console.log(tx.hash);
@@ -99,10 +99,11 @@ const checkingReward = async () => {
 
 
 const main = async () => {
-  // await extendOwnership()
+  await extendOwnership()
+  await withdraw()
   // await register();
   // await claimReward();
-  await checkingReward();
+  // await checkingReward();
 };
 
 main().catch((error) => {

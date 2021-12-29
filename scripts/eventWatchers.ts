@@ -5,13 +5,14 @@ import { convertBnToDecimal } from './BO/utils';
 // event OwnershipExtension (address _listing, address _prevOwner, address _newOwner, uint256 _start, uint256 _end);
 TokenInstance.on(
   'OwnershipExtension',
-  async (_listing: string, _prevOwner: string, _newOwner: string, _start: BigNumber, _end: BigNumber) => {
+  async (_listing: string, _prevOwner: string, _newOwner: string, _start: BigNumber, _end: BigNumber, _amount: BigNumber) => {
     console.log(`---------BEGIN LOGGING OwnershipExtension--------------`);
     console.log(`_listing: ${_listing}`);
     console.log(`_prevOwner: ${_prevOwner}`);
     console.log(`_newOwner: ${_newOwner}`);
     console.log(`_start: ${_start.toString()}`);
     console.log(`_end: ${_end.toString()}`);
+    console.log(`_amount: ${convertBnToDecimal(_amount)}`);
     console.log(`---------END LOGGING OwnershipExtension--------------`);
   }
 );

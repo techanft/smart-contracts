@@ -168,42 +168,49 @@ contract Listing is ListingStorage {
     * Staking status should be active (stakeholder hasnt unregistered)
     * Users must have at least `_amount` tokens in their balance
     *
+    * This function is automatically triggered when {register} or {unregister} functions are called 
+    *
     * If the transfer from the funds address to user's address fulfilled, an {Claim} event is emitted
     * rewardPool is decreased by the payout amount, and the stake start is reset to the current block.timestamp
     */
     function claimReward (uint256 _optionId) public {
-        StakingModel storage userStake = stakings[_optionId][msg.sender];
-        require(userStake._active, "Listing: Register first!");
+        StakingModel storage chosenStake = stakings[_optionId][msg.sender];
+        require(chosenStake._active, "Listing: Register first!");
 
         uint256 callerBalance = Token(tokenContract).balanceOf(msg.sender);
-        require(callerBalance >= userStake._amount, "Listing: Insufficient balance!");
+        require(callerBalance >= chosenStake._amount, "Listing: Insufficient balance!");
 
-        uint256 payoutAmount = calculateStakeholderReward(_optionId, userStake);
+        uint256 payoutAmount = calculateStakeholderReward(_optionId, chosenStake);
         bool success = Token(tokenContract).handleListingTx(msg.sender, payoutAmount, false);
         require(success, "Listing: Unsuccessful attempt!");
 
-        Token(tokenContract).triggerClaimEvent(msg.sender, payoutAmount, userStake._start, block.timestamp);
+        Token(tokenContract).triggerClaimEvent(msg.sender, payoutAmount, chosenStake._start, block.timestamp);
 
-        userStake._start = block.timestamp;
+        chosenStake._start = block.timestamp;
+        // TODO: Check the reward poll before subbing
         rewardPool = rewardPool.sub(payoutAmount);              
     }
 
     /**
     * @dev User can register to be a stakeholder.
     * 
-    * NOTE The key difference of this staking model is the user's token balance isnt deducted (like other staking models).
-    * Users, however, need to have at least registered amount in their balance WHEN they claim rewards
-    *
-    * If `_increase` is true, user's token balance must gte than `_amount` + `currentStake`
-    * If `_increase` is false, user's token balance must gte than  `currentStake` - `_amount`
+    * NOTE The key difference of this staking model is the user's token balance isnt transfered
+    * to another staking address (like other staking models).
+    * Users, however, need to have at least registering amount in their balance WHEN they register AND claim rewards
     *
     * Users cant register for inactive listing
     *
-    * `_amount` is the registered amount
+    * `_amount` is the registering amount
     * `_optionId` is the option which user would like to register
-    * `_increase` flag helps user increase/decrease the amount they previously registered
     *
-    * Both listing total stake and option total stake is increased/decreased by `_amount`, according to the `_increase` flag
+    * New registering amount will replace previous registering amount
+    *
+    * Both listing total stake and option total stake is increased/decreased by the difference between
+    * previous registering amount and current registering amount
+    *
+    * In case stakeholders would like to update their registering amount, they are still rewarded
+    * for the period between previous and current registering timestamps
+    *
     * Emits an {Register} event
     */
     function register (uint256 _amount, uint256 _optionId) public onlyActiveListing {
@@ -214,6 +221,10 @@ contract Listing is ListingStorage {
 
         uint256 callerBalance = Token(tokenContract).balanceOf(msg.sender);
         require(callerBalance >= _amount, "Listing: Insufficient balance!");
+
+        if (chosenStake._amount != 0) {
+            claimReward(_optionId);
+        }
 
         bool stakeIncreased = _amount > chosenStake._amount;
         uint256 difference = stakeIncreased ? _amount.sub(chosenStake._amount) : chosenStake._amount.sub(_amount);
@@ -243,21 +254,27 @@ contract Listing is ListingStorage {
     *
     * `_optionId` is the option which user would like to unregister
     *
+    * Stakeholders are rewarded for the period between registering and unregistering timestamps
+    *
     * Both listing total stake and option total stake is decreased by `_amount`
     * Emits an {Unregister} event
     */
     function unregister(uint256 _optionId) public onlyActiveListing {
-        StakingModel storage userStake = stakings[_optionId][msg.sender];
+        StakingModel storage chosenStake = stakings[_optionId][msg.sender];
 
-        require(userStake._active, "Listing: Register first!");
+        require(chosenStake._active, "Listing: Register first!");
 
-        options[_optionId]._totalStake = options[_optionId]._totalStake.sub(userStake._amount);
+        if (chosenStake._amount != 0) {
+            claimReward(_optionId);
+        }
 
-        totalStake = totalStake.sub(userStake._amount);
+        options[_optionId]._totalStake = options[_optionId]._totalStake.sub(chosenStake._amount);
 
-        userStake._amount = 0;
-        userStake._active = false;
-        userStake._start = 0;
+        totalStake = totalStake.sub(chosenStake._amount);
+
+        chosenStake._amount = 0;
+        chosenStake._active = false;
+        chosenStake._start = 0;
 
         Token(tokenContract).triggerUnregisterEvent(msg.sender, _optionId);
     }

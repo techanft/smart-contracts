@@ -352,7 +352,7 @@ export const v1 = () => {
         expect(_owner).to.equal(listingOwner1.address);
         expect(_listingAddress).to.equal(address);
       });
-
+ 
       describe('Listing ownership extension', () => {
         it('Owner can extend ownership. Token Contract & Listing Contract states are updated properly', async () => {
           const ownerBal_1 = await ANFTInstance.balanceOf(listingOwner1.address);
@@ -703,8 +703,14 @@ export const v1 = () => {
       });
 
       describe('Users register for staking', () => {
+        const suppliedAmountForStakingAddress = tokenAmountBN(50_000);
+        const rewardPoolAmount = tokenAmountBN(10_000);
         const registeredAmount = tokenAmountBN(100_000);
         const option0 = 0;
+        beforeEach(async () => {
+          await ANFTInstance.transfer(stakingAcc.address, suppliedAmountForStakingAddress);
+          await listingInstance.connect(listingOwner1).extendOwnership(rewardPoolAmount);
+        });
 
         it("Options are inactive at first, until they're setup by validator", async () => {
           const optionId = 1;
@@ -719,7 +725,7 @@ export const v1 = () => {
           expect(optionStatus_2._isSet);
           expect(optionStatus_2._reward).equal(BigNumber.from(optionReward));
         });
-        
+
         it("Users cant register more than their token balance",async () => {
           const userBalance = await ANFTInstance.balanceOf(stakeholder1.address);
           await expect(
@@ -747,7 +753,6 @@ export const v1 = () => {
           await expect(listingInstance.connect(stakeholder1).register(registeredAmount, option0)).to.be.not.reverted;
         });
 
-
         it("Option's pool stake, user's stake, totalStake is increased when register amount > currentStake.amount", async () => {
           const totalStake_1 = await listingInstance.totalStake();
           const { _totalStake: totalPoolStake_1 } = await listingInstance.options(option0);
@@ -767,7 +772,7 @@ export const v1 = () => {
           expect(stakingRecord_1._amount).equal(stakingRecord_2._amount.sub(registeredAmount));
         });
 
-        it("Option's pool stake, user's stake, totalStake is increased when register amount > currentStake.amount", async () => {
+        it("Option's pool stake, user's stake, totalStake is decreased when register amount < currentStake.amount", async () => {
           await listingInstance.connect(stakeholder1).register(registeredAmount, option0);
 
           const totalStake_1 = await listingInstance.totalStake();
@@ -789,6 +794,51 @@ export const v1 = () => {
           expect(stakingRecord_1._amount).equal(stakingRecord_2._amount.add(newRegisterAmount));
         });
 
+        it('In case of overriding previous register amount, stakeholder will still be rewarded before register amount is overrided', async () => {
+          const rp_1 = await listingInstance.rewardPool();
+          const stakingBal_1 = await ANFTInstance.balanceOf(stakingAcc.address);
+          const stakeholderBal_1 = await ANFTInstance.balanceOf(stakeholder1.address);
+
+          await listingInstance.connect(stakeholder1).register(registeredAmount, option0);
+          // First time register, balances and pools are expected to stay the same
+          const rp_2 = await listingInstance.rewardPool();
+          const stakingBal_2 = await ANFTInstance.balanceOf(stakingAcc.address);
+          const stakeholderBal_2 = await ANFTInstance.balanceOf(stakeholder1.address);
+          expect(rp_1.eq(rp_2)).to.be.true;
+          expect(stakingBal_1.eq(stakingBal_2)).to.be.true; 
+          expect(stakeholderBal_1.eq(stakeholderBal_2)).to.be.true;
+
+          const firstRegisterTS = (await listingInstance.stakings(option0, stakeholder1.address))._start;
+
+          // Set a specific Timestamp for the next block to estimate the reward amount for testing purpose
+          const preDefinedOverrideTS = firstRegisterTS.add(86000); 
+          await ethers.provider.send("evm_setNextBlockTimestamp", [preDefinedOverrideTS.toNumber()]);
+
+          // Proceed to override previous register amount
+          // Stakeholder is still rewarded for the time period between 2 registering timestamps        
+          const expectedReward = await calculateStakeHolderReward({
+            stakeStart: firstRegisterTS,
+            instance: listingInstance,
+            optionId: option0,
+            stakeholder: stakeholder1.address,
+            blockTS: preDefinedOverrideTS,
+          });
+
+          const overrideTx = await listingInstance.connect(stakeholder1).register(registeredAmount.div(2), option0);
+          const overrideReceipt = await overrideTx.wait();
+          const overrideTS = (await ethers.provider.getBlock(overrideReceipt.blockNumber)).timestamp;
+          expect(overrideTS).equal(preDefinedOverrideTS.toNumber())
+          
+          const rp_3 = await listingInstance.rewardPool();
+          const stakingBal_3 = await ANFTInstance.balanceOf(stakingAcc.address);
+          const stakeholderBal_3 = await ANFTInstance.balanceOf(stakeholder1.address);
+          expect(rp_3).equal(rp_2.sub(expectedReward))
+          expect(stakingBal_3).equal(stakingBal_2.sub(expectedReward))
+          expect(stakeholderBal_3).equal(stakeholderBal_2.add(expectedReward))
+          
+        });
+
+
         it('User cant register for inactive listing', async () => {
           await expect(listingInstance.connect(stakeholder1).register(registeredAmount, option0)).to.be.not.reverted;
 
@@ -803,10 +853,18 @@ export const v1 = () => {
       describe('User unregister for staking', () => {
         const registeredAmount = tokenAmountBN(100_000);
         const option0 = 0;
+        const suppliedAmountForStakingAddress = tokenAmountBN(50_000);
+        const rewardPoolAmount = tokenAmountBN(10_000);
+        let stakeStart: BigNumber;
+
         beforeEach(async () => {
           await listingInstance.connect(stakeholder1).register(registeredAmount, option0);
-        });
+          await ANFTInstance.transfer(stakingAcc.address, suppliedAmountForStakingAddress);
+          await listingInstance.connect(listingOwner1).extendOwnership(rewardPoolAmount);
 
+          stakeStart = (await listingInstance.stakings(option0, stakeholder1.address))._start;
+        });
+        
         it('User must register first', async () => {
           const optionInfo_1 = await listingInstance.options(option0);
 
@@ -818,6 +876,37 @@ export const v1 = () => {
 
           expect(optionInfo_1._totalStake).equal(optionInfo_2._totalStake);
         });
+
+        it("User is rewarded for the time period between register timestamp and unregister timestamp",async () => {
+          const rp_1 = await listingInstance.rewardPool();
+          const stakingBal_1 = await ANFTInstance.balanceOf(stakingAcc.address);
+          const stakeholderBal_1 = await ANFTInstance.balanceOf(stakeholder1.address);
+
+          const preDefinedUnregisterTS = stakeStart.add(86000); 
+          await ethers.provider.send("evm_setNextBlockTimestamp", [preDefinedUnregisterTS.toNumber()]);
+
+          const expectedReward = await calculateStakeHolderReward({
+            stakeStart,
+            instance: listingInstance,
+            optionId: option0,
+            stakeholder: stakeholder1.address,
+            blockTS: preDefinedUnregisterTS,
+          });
+
+          const unregisterTx = await listingInstance.connect(stakeholder1).register(registeredAmount.div(2), option0);
+          const unregisterReceipt = await unregisterTx.wait();
+          const unregisterTS = (await ethers.provider.getBlock(unregisterReceipt.blockNumber)).timestamp;
+          expect(unregisterTS).equal(preDefinedUnregisterTS.toNumber())
+          
+          const rp_2 = await listingInstance.rewardPool();
+          const stakingBal_2 = await ANFTInstance.balanceOf(stakingAcc.address);
+          const stakeholderBal_2 = await ANFTInstance.balanceOf(stakeholder1.address);
+          expect(rp_2).equal(rp_1.sub(expectedReward))
+          expect(stakingBal_2).equal(stakingBal_1.sub(expectedReward))
+          expect(stakeholderBal_2).equal(stakeholderBal_1.add(expectedReward))
+          
+
+        })
 
         it('User Staking properties is reset to 0', async () => {
           const stakingInfo_1 = await listingInstance.stakings(option0, stakeholder1.address);

@@ -8,7 +8,7 @@ import { TokenInstance } from './BO/grantValidatorRole';
 import { calculateStakeHolderReward, getCurrentUnix } from '../test/utils';
 
 const [first, second, third, fourth, fifth, sixth, seventh, eighth] = listingAddrs;
-const listingInstance = <Listing>new ethers.Contract(first, listingArtifact.abi, provider);
+const listingInstance = <Listing>new ethers.Contract(second, listingArtifact.abi, provider);
 
 const { OWNER_PK } = process.env;
 const { STAKEHOLDER_PK } = process.env;
@@ -20,7 +20,7 @@ const extendOwnership = async () => {
   const contractWithSigner = listingInstance.connect(ownerWallet);
   const dailyPayment = await contractWithSigner.dailyPayment();
   console.log(`Daily Payment: ${convertBnToDecimal(dailyPayment)}`);
-  const extendingValue = convertDecimalToBn(String(500));
+  const extendingValue = convertDecimalToBn(String(1_500));
   const tx = await contractWithSigner.extendOwnership(extendingValue);
   await tx.wait();
   console.log(tx.hash);
@@ -34,22 +34,23 @@ const withdraw = async () => {
   console.log(tx.hash);
 };
 
+const option = 0;
+
 const register = async () => {
   const contractWithSigner = listingInstance.connect(shWallet);
-  const optionToRegister = 0;
-
-  const optionInfoBefore = await contractWithSigner.options(optionToRegister);
+  
+  const optionInfoBefore = await contractWithSigner.options(option);
   const listingTotalStakeBefore = await contractWithSigner.totalStake();
   console.log(`optionInfoBefore._reward: ${optionInfoBefore._reward}`);
   console.log(`optionInfoBefore._totalStake: ${convertBnToDecimal(optionInfoBefore._totalStake)}`);
   console.log(`listingTotalStakeBefore: ${convertBnToDecimal(listingTotalStakeBefore)}`);
 
   const amountToRegister = convertDecimalToBn(String(50_000_000));
-  const tx = await contractWithSigner.register(amountToRegister, optionToRegister);
+  const tx = await contractWithSigner.register(amountToRegister, option);
   await tx.wait();
   console.log(tx.hash);
 
-  const optionInfoAfter = await contractWithSigner.options(optionToRegister);
+  const optionInfoAfter = await contractWithSigner.options(option);
   const listingTotalStakeAfter = await contractWithSigner.totalStake();
   console.log(`==========================================`);
   console.log(`optionInfoAfter._reward: ${optionInfoAfter._reward}`);
@@ -59,51 +60,60 @@ const register = async () => {
 
 const claimReward = async () => {
   const contractWithSigner = listingInstance.connect(shWallet);
-  const optionToClaim = 0;
-  
+
   const rewardPoolBefore = await listingInstance.rewardPool();
-  const optionInfoBefore = await contractWithSigner.options(optionToClaim);
+  const optionInfoBefore = await contractWithSigner.options(option);
+
+  const { _start } = await listingInstance.stakings(option, shWallet.address);
   
-  console.log(`optionInfoBefore._reward: ${convertBnToDecimal(optionInfoBefore._reward)}`);
+  console.log(`optionInfoBefore._reward: ${optionInfoBefore._reward.toNumber()}`);
   console.log(`optionInfoBefore._totalStake: ${convertBnToDecimal(optionInfoBefore._totalStake)}`);
 
   console.log(`rewardPoolBefore: ${convertBnToDecimal(rewardPoolBefore)}`);
 
-  const claimTx = await contractWithSigner.claimReward(optionToClaim);
-  await claimTx.wait();
+  const claimTx = await contractWithSigner.claimReward(option);
+  const claimReceipt = await claimTx.wait();
+  const claimTS = (await provider.getBlock(claimReceipt.blockNumber)).timestamp;
+  
+  console.log(`_stakeStart: ${_start}`)
+  console.log(`claimTS: ${claimTS}`);
+
+  console.log(`claimHash: ${claimTx.hash}`)
 
   const rewardPoolAfter = await listingInstance.rewardPool();
-  const optionInfoAfter = await contractWithSigner.options(optionToClaim);
+  const optionInfoAfter = await contractWithSigner.options(option);
   
-  console.log(`optionInfoAfter._reward: ${convertBnToDecimal(optionInfoAfter._reward)}`);
+  console.log(`optionInfoAfter._reward: ${(optionInfoAfter._reward).toNumber()}`);
   console.log(`optionInfoAfter._totalStake: ${convertBnToDecimal(optionInfoAfter._totalStake)}`);
   console.log(`rewardPoolAfter: ${convertBnToDecimal(rewardPoolAfter)}`);
 
 };
 const checkingReward = async () => {
-  const optionToClaim = 0;
-  const { _start } = await listingInstance.stakings(optionToClaim, shWallet.address);
-  const currentUnix = getCurrentUnix();
+
+  // const { _start } = await listingInstance.stakings(optionToClaim, shWallet.address);
+  const _start = BigNumber.from(1640835380);
+  // const currentUnix = getCurrentUnix();
+  const currentBlockTS = BigNumber.from(1640835755)
 
   const result = await calculateStakeHolderReward(
     {
-      optionId: optionToClaim,
+      optionId: option,
       instance: listingInstance,
       stakeholder: shWallet.address,
       stakeStart: _start,
-      blockTS: BigNumber.from(currentUnix)
+      blockTS: currentBlockTS
     }
   )
-  console.log(`result: ${(result)}`);
+  console.log(`result: ${(convertBnToDecimal(result))}`);
 }
 
 
 const main = async () => {
-  await extendOwnership()
-  await withdraw()
+  // await extendOwnership()
+  // await withdraw()
   // await register();
   // await claimReward();
-  // await checkingReward();
+  await checkingReward();
 };
 
 main().catch((error) => {

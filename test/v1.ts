@@ -358,7 +358,6 @@ export const v1 = () => {
           const ownerBal_1 = await ANFTInstance.balanceOf(listingOwner1.address);
           const SABal_1 = await ANFTInstance.balanceOf(stakingAcc.address);
 
-          const rewardPool_1 = await listingInstance.rewardPool();
           const initialOwnership = await listingInstance.ownership();
 
           const extendOwnershipTx = await listingInstance.connect(listingOwner1).extendOwnership(extensionValues);
@@ -368,11 +367,9 @@ export const v1 = () => {
 
           const ownerBal_2 = await ANFTInstance.balanceOf(listingOwner1.address);
           const SABal_2 = await ANFTInstance.balanceOf(stakingAcc.address);
-          const rewardPool_2 = await listingInstance.rewardPool();
 
           expect(ownerBal_1).equal(ownerBal_2.add(extensionValues));
           expect(SABal_1).equal(SABal_2.sub(extensionValues));
-          expect(rewardPool_1).equal(rewardPool_2.sub(extensionValues));
 
           const { _end } = await calculateOwnershipExtension({
             initialOwnership: initialOwnership.toNumber(),
@@ -405,7 +402,6 @@ export const v1 = () => {
         it('Owner cant extend ownership with inactive listing', async () => {
           const ownerBal_1 = await ANFTInstance.balanceOf(listingOwner1.address);
           const SABal_1 = await ANFTInstance.balanceOf(stakingAcc.address);
-          const rewardPool_1 = await listingInstance.rewardPool();
           const ownershipValue_1 = await listingInstance.ownership();
 
           await ANFTInstance.connect(validator).toggleListingStatus(listingAddress);
@@ -416,12 +412,10 @@ export const v1 = () => {
 
           const ownerBal_2 = await ANFTInstance.balanceOf(listingOwner1.address);
           const SABal_2 = await ANFTInstance.balanceOf(stakingAcc.address);
-          const rewardPool_2 = await listingInstance.rewardPool();
           const ownershipValue_2 = await listingInstance.ownership();
 
           expect(ownerBal_1).equal(ownerBal_2);
           expect(SABal_1).equal(SABal_2);
-          expect(rewardPool_1).equal(rewardPool_2);
           expect(ownershipValue_1).equal(ownershipValue_2);
         });
 
@@ -662,26 +656,9 @@ export const v1 = () => {
           expect(listingOwnerBal_2.add(withdrawAmount)).equal(listingOwnerBal_3);
         });
 
-        it('rewardPool is updated accordingly when owner extends ownership or withdraw', async () => {
-          const rewardPool_1 = await listingInstance.rewardPool();
-
-          await listingInstance.connect(listingOwner1).extendOwnership(extensionValues);
-
-          const rewardPool_2 = await listingInstance.rewardPool();
-
-          expect(rewardPool_1.add(extensionValues)).equal(rewardPool_2);
-
-          const withdrawTx = await listingInstance.connect(listingOwner1).withdraw(withdrawAmount);
-          await withdrawTx.wait();
-
-          const rewardPool_3 = await listingInstance.rewardPool();
-
-          expect(rewardPool_2.sub(withdrawAmount)).equal(rewardPool_3);
-        });
 
         it('Owner cant withdraw with inactive listing', async () => {
           await listingInstance.connect(listingOwner1).extendOwnership(extensionValues);
-          const rewardPool_1 = await listingInstance.rewardPool();
           const ownership_1 = await listingInstance.ownership();
 
           await ANFTInstance.connect(deployer).toggleListingStatus(listingAddress);
@@ -694,10 +671,8 @@ export const v1 = () => {
             'Token: Inactive Listing'
           );
 
-          const rewardPool_2 = await listingInstance.rewardPool();
           const ownership_2 = await listingInstance.ownership();
 
-          expect(rewardPool_1).equal(rewardPool_2);
           expect(ownership_1).equal(ownership_2);
         });
       });
@@ -795,16 +770,13 @@ export const v1 = () => {
         });
 
         it('In case of overriding previous register amount, stakeholder will still be rewarded before register amount is overrided', async () => {
-          const rp_1 = await listingInstance.rewardPool();
           const stakingBal_1 = await ANFTInstance.balanceOf(stakingAcc.address);
           const stakeholderBal_1 = await ANFTInstance.balanceOf(stakeholder1.address);
 
           await listingInstance.connect(stakeholder1).register(registeredAmount, option0);
-          // First time register, balances and pools are expected to stay the same
-          const rp_2 = await listingInstance.rewardPool();
+          // First time register, balances are expected to stay the same
           const stakingBal_2 = await ANFTInstance.balanceOf(stakingAcc.address);
           const stakeholderBal_2 = await ANFTInstance.balanceOf(stakeholder1.address);
-          expect(rp_1.eq(rp_2)).to.be.true;
           expect(stakingBal_1.eq(stakingBal_2)).to.be.true; 
           expect(stakeholderBal_1.eq(stakeholderBal_2)).to.be.true;
 
@@ -829,10 +801,8 @@ export const v1 = () => {
           const overrideTS = (await ethers.provider.getBlock(overrideReceipt.blockNumber)).timestamp;
           expect(overrideTS).equal(preDefinedOverrideTS.toNumber())
           
-          const rp_3 = await listingInstance.rewardPool();
           const stakingBal_3 = await ANFTInstance.balanceOf(stakingAcc.address);
           const stakeholderBal_3 = await ANFTInstance.balanceOf(stakeholder1.address);
-          expect(rp_3).equal(rp_2.sub(expectedReward))
           expect(stakingBal_3).equal(stakingBal_2.sub(expectedReward))
           expect(stakeholderBal_3).equal(stakeholderBal_2.add(expectedReward))
           
@@ -878,7 +848,6 @@ export const v1 = () => {
         });
 
         it("User is rewarded for the time period between register timestamp and unregister timestamp",async () => {
-          const rp_1 = await listingInstance.rewardPool();
           const stakingBal_1 = await ANFTInstance.balanceOf(stakingAcc.address);
           const stakeholderBal_1 = await ANFTInstance.balanceOf(stakeholder1.address);
 
@@ -898,10 +867,8 @@ export const v1 = () => {
           const unregisterTS = (await ethers.provider.getBlock(unregisterReceipt.blockNumber)).timestamp;
           expect(unregisterTS).equal(preDefinedUnregisterTS.toNumber())
           
-          const rp_2 = await listingInstance.rewardPool();
           const stakingBal_2 = await ANFTInstance.balanceOf(stakingAcc.address);
           const stakeholderBal_2 = await ANFTInstance.balanceOf(stakeholder1.address);
-          expect(rp_2).equal(rp_1.sub(expectedReward))
           expect(stakingBal_2).equal(stakingBal_1.sub(expectedReward))
           expect(stakeholderBal_2).equal(stakeholderBal_1.add(expectedReward))
           
@@ -1077,7 +1044,6 @@ export const v1 = () => {
         it('User cant claim reward with inactive listing', async () => {
           const SABal_1 = await ANFTInstance.balanceOf(stakingAcc.address);
           const SHBal_1 = await ANFTInstance.balanceOf(stakeholder1.address);
-          const rewardPool_1 = await listingInstance.rewardPool();
 
           await ANFTInstance.connect(validator).toggleListingStatus(listingAddress);
 
@@ -1087,11 +1053,9 @@ export const v1 = () => {
 
           const SABal_2 = await ANFTInstance.balanceOf(stakingAcc.address);
           const SHBal_2 = await ANFTInstance.balanceOf(stakeholder1.address);
-          const rewardPool_2 = await listingInstance.rewardPool();
 
           expect(SABal_1).equal(SABal_2);
           expect(SHBal_1).equal(SHBal_2);
-          expect(rewardPool_1).equal(rewardPool_2);
         });
 
         it('Cant claim reward if funds balance is insufficient', async () => {
@@ -1115,25 +1079,6 @@ export const v1 = () => {
           await expect(listingInstance.connect(stakeholder1).claimReward(option0)).to.be.revertedWith(
             'Listing: Insufficient balance!'
           );
-        });
-
-        it('Reward pool is decreased by reward amount', async () => {
-          const rewardPool_1 = await listingInstance.rewardPool();
-
-          const claimTx = await listingInstance.connect(stakeholder1).claimReward(option0);
-          const claimReceipt = await claimTx.wait();
-          const claimTS = (await ethers.provider.getBlock(claimReceipt.blockNumber)).timestamp;
-
-          const expectedReward = await calculateStakeHolderReward({
-            stakeStart,
-            instance: listingInstance,
-            optionId: option0,
-            stakeholder: stakeholder1.address,
-            blockTS: BigNumber.from(claimTS),
-          });
-
-          const rewardPool_2 = await listingInstance.rewardPool();
-          expect(rewardPool_2).equal(rewardPool_1.sub(expectedReward));
         });
 
         it('Staking _start is updated to current block.timestamp', async () => {
@@ -1460,7 +1405,6 @@ export const v1 = () => {
 
           it('Owner cant withdraw with inactive listing', async () => {
             await listingInstance.connect(listingOwner1).extendOwnership(extensionValues);
-            const rewardPool_1 = await listingInstance.rewardPool();
             const ownership_1 = await listingInstance.ownership();
 
             await upgradeInstance.connect(deployer).toggleListingStatus(listingAddress);
@@ -1473,10 +1417,8 @@ export const v1 = () => {
               'Token: Inactive Listing'
             );
 
-            const rewardPool_2 = await listingInstance.rewardPool();
             const ownership_2 = await listingInstance.ownership();
 
-            expect(rewardPool_1).equal(rewardPool_2);
             expect(ownership_1).equal(ownership_2);
           });
         });
@@ -1608,7 +1550,6 @@ export const v1 = () => {
           it('User cant claim reward with inactive listing', async () => {
             const SABal_1 = await upgradeInstance.balanceOf(stakingAcc.address);
             const SHBal_1 = await upgradeInstance.balanceOf(stakeholder1.address);
-            const rewardPool_1 = await listingInstance.rewardPool();
 
             await upgradeInstance.connect(validator).toggleListingStatus(listingAddress);
 
@@ -1618,11 +1559,9 @@ export const v1 = () => {
 
             const SABal_2 = await upgradeInstance.balanceOf(stakingAcc.address);
             const SHBal_2 = await upgradeInstance.balanceOf(stakeholder1.address);
-            const rewardPool_2 = await listingInstance.rewardPool();
 
             expect(SABal_1).equal(SABal_2);
             expect(SHBal_1).equal(SHBal_2);
-            expect(rewardPool_1).equal(rewardPool_2);
           });
 
           it('Cant claim reward if funds balance is insufficient', async () => {

@@ -38,15 +38,6 @@ contract Listing is ListingStorage {
     }
     mapping (uint256 => mapping (address => StakingModel)) public stakings;
 
-    /**
-    * @dev The reward pool is for paying out rewards for stakeholder.
-    * 
-    * Reward pool is:
-    *   - Increased when owner transfer tokens to extend ownership
-    *   - Decreased when owner withdraw tokens
-    *   - Decreased when paying rewards for stakeholder.
-    */
-    uint256 public rewardPool;
 
     /**
     * @dev Total stake represents the tokens are staked for all options
@@ -116,7 +107,6 @@ contract Listing is ListingStorage {
             existingOwnership = block.timestamp;
         }
 
-        rewardPool = rewardPool.add(_amount);
         
         ownership = existingOwnership.add(_amount.mul(86400).div(dailyPayment));
         Token(tokenContract).triggerOwnershipExtensionEvent(existingOwner, owner, existingOwnership, ownership, _amount);
@@ -141,7 +131,7 @@ contract Listing is ListingStorage {
     * `OS2` must be in the future (larger or equal to block.timestamp)
     *
     * `_amount` shall be transfered from Funds account to user, if success the ownership value
-    * should be reset to current TS, and rewardPool is decreased by `_amount`
+    * should be reset to current TS
     */
     function withdraw(uint256 _amount) public {
         require(msg.sender == owner, "Listing: Unauth!");
@@ -155,7 +145,6 @@ contract Listing is ListingStorage {
         bool success = Token(tokenContract).handleListingTx(msg.sender, _amount, false);
         require(success, "Listing: Unsuccessful attempt!");
 
-        rewardPool = rewardPool.sub(_amount);
         Token(tokenContract).triggerWithdrawEvent(owner, _amount, ownership, newOwnership);
         ownership = newOwnership;
     }
@@ -171,7 +160,7 @@ contract Listing is ListingStorage {
     * This function is automatically triggered when {register} or {unregister} functions are called 
     *
     * If the transfer from the funds address to user's address fulfilled, an {Claim} event is emitted
-    * rewardPool is decreased by the payout amount, and the stake start is reset to the current block.timestamp
+    * the stake start is reset to the current block.timestamp
     */
     function claimReward (uint256 _optionId) public {
         StakingModel storage chosenStake = stakings[_optionId][msg.sender];
@@ -187,8 +176,6 @@ contract Listing is ListingStorage {
         Token(tokenContract).triggerClaimEvent(msg.sender, payoutAmount, chosenStake._start, block.timestamp);
 
         chosenStake._start = block.timestamp;
-        // TODO: Check the reward poll before subbing
-        rewardPool = rewardPool.sub(payoutAmount);              
     }
 
     /**

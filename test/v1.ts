@@ -338,6 +338,32 @@ export const v1 = () => {
         expect(firstOption_3._isSet);
       });
 
+      it('Trigers an UpdateValue event when validator update listing value', async () => {
+        const listingVal = tokenAmountBN(1000);
+
+        const updateTx_1 = await listingInstance.connect(validator).updateValue(listingVal);
+        await expect(updateTx_1).to.emit(ANFTInstance, 'UpdateValue').withArgs(listingInstance.address, listingVal);
+
+        const updateTx_2 = await listingInstance.connect(validator).updateValue(listingVal.div(2));
+        await expect(updateTx_2)
+          .to.emit(ANFTInstance, 'UpdateValue')
+          .withArgs(listingInstance.address, listingVal.div(2));
+      });
+
+      it('Trigers an UpdateDailyPayment event when validator update listing daily payment', async () => {
+        const listingDP = tokenAmountBN(1000);
+
+        const updateTx_1 = await listingInstance.connect(validator).updateDailyPayment(listingDP);
+        await expect(updateTx_1)
+          .to.emit(ANFTInstance, 'UpdateDailyPayment')
+          .withArgs(listingInstance.address, listingDP);
+
+        const updateTx_2 = await listingInstance.connect(validator).updateDailyPayment(listingDP.mul(2));
+        await expect(updateTx_2)
+          .to.emit(ANFTInstance, 'UpdateDailyPayment')
+          .withArgs(listingInstance.address, listingDP.mul(2));
+      });
+
       it('Listing Creation event is created with correct arguments', async () => {
         const createListingTx = ANFTInstance.connect(validator).createListing(listingOwner1.address, listingId);
         await expect(createListingTx).to.emit(ANFTInstance, 'ListingCreation');
@@ -352,7 +378,7 @@ export const v1 = () => {
         expect(_owner).to.equal(listingOwner1.address);
         expect(_listingAddress).to.equal(address);
       });
- 
+
       describe('Listing ownership extension', () => {
         it('Owner can extend ownership. Token Contract & Listing Contract states are updated properly', async () => {
           const ownerBal_1 = await ANFTInstance.balanceOf(listingOwner1.address);
@@ -442,7 +468,7 @@ export const v1 = () => {
               listingOwner1.address,
               listingOwner1.address,
               expectedStart,
-              expectedEnd, 
+              expectedEnd,
               extensionValues
             );
         });
@@ -656,7 +682,6 @@ export const v1 = () => {
           expect(listingOwnerBal_2.add(withdrawAmount)).equal(listingOwnerBal_3);
         });
 
-
         it('Owner cant withdraw with inactive listing', async () => {
           await listingInstance.connect(listingOwner1).extendOwnership(extensionValues);
           const ownership_1 = await listingInstance.ownership();
@@ -701,14 +726,16 @@ export const v1 = () => {
           expect(optionStatus_2._reward).equal(BigNumber.from(optionReward));
         });
 
-        it("Users cant register more than their token balance",async () => {
+        it('Users cant register more than their token balance', async () => {
           const userBalance = await ANFTInstance.balanceOf(stakeholder1.address);
-          await expect(
-            listingInstance.connect(stakeholder1).register(userBalance.add(1), option0)
-          ).to.be.revertedWith('Listing: Insufficient balance!');
+          await expect(listingInstance.connect(stakeholder1).register(userBalance.add(1), option0)).to.be.revertedWith(
+            'Listing: Insufficient balance!'
+          );
           await expect(listingInstance.connect(stakeholder1).register(userBalance, option0)).to.be.not.reverted;
-          await expect(listingInstance.connect(stakeholder1).register(userBalance, option0)).to.be.revertedWith("Listing: Stake unchanged!");
-        })
+          await expect(listingInstance.connect(stakeholder1).register(userBalance, option0)).to.be.revertedWith(
+            'Listing: Stake unchanged!'
+          );
+        });
 
         it('Option reward value can not exceed 100', async () => {
           const optionId = 1;
@@ -777,17 +804,17 @@ export const v1 = () => {
           // First time register, balances are expected to stay the same
           const stakingBal_2 = await ANFTInstance.balanceOf(stakingAcc.address);
           const stakeholderBal_2 = await ANFTInstance.balanceOf(stakeholder1.address);
-          expect(stakingBal_1.eq(stakingBal_2)).to.be.true; 
+          expect(stakingBal_1.eq(stakingBal_2)).to.be.true;
           expect(stakeholderBal_1.eq(stakeholderBal_2)).to.be.true;
 
           const firstRegisterTS = (await listingInstance.stakings(option0, stakeholder1.address))._start;
 
           // Set a specific Timestamp for the next block to estimate the reward amount for testing purpose
-          const preDefinedOverrideTS = firstRegisterTS.add(86000); 
-          await ethers.provider.send("evm_setNextBlockTimestamp", [preDefinedOverrideTS.toNumber()]);
+          const preDefinedOverrideTS = firstRegisterTS.add(86000);
+          await ethers.provider.send('evm_setNextBlockTimestamp', [preDefinedOverrideTS.toNumber()]);
 
           // Proceed to override previous register amount
-          // Stakeholder is still rewarded for the time period between 2 registering timestamps        
+          // Stakeholder is still rewarded for the time period between 2 registering timestamps
           const expectedReward = await calculateStakeHolderReward({
             stakeStart: firstRegisterTS,
             instance: listingInstance,
@@ -799,15 +826,13 @@ export const v1 = () => {
           const overrideTx = await listingInstance.connect(stakeholder1).register(registeredAmount.div(2), option0);
           const overrideReceipt = await overrideTx.wait();
           const overrideTS = (await ethers.provider.getBlock(overrideReceipt.blockNumber)).timestamp;
-          expect(overrideTS).equal(preDefinedOverrideTS.toNumber())
-          
+          expect(overrideTS).equal(preDefinedOverrideTS.toNumber());
+
           const stakingBal_3 = await ANFTInstance.balanceOf(stakingAcc.address);
           const stakeholderBal_3 = await ANFTInstance.balanceOf(stakeholder1.address);
-          expect(stakingBal_3).equal(stakingBal_2.sub(expectedReward))
-          expect(stakeholderBal_3).equal(stakeholderBal_2.add(expectedReward))
-          
+          expect(stakingBal_3).equal(stakingBal_2.sub(expectedReward));
+          expect(stakeholderBal_3).equal(stakeholderBal_2.add(expectedReward));
         });
-
 
         it('User cant register for inactive listing', async () => {
           await expect(listingInstance.connect(stakeholder1).register(registeredAmount, option0)).to.be.not.reverted;
@@ -834,7 +859,7 @@ export const v1 = () => {
 
           stakeStart = (await listingInstance.stakings(option0, stakeholder1.address))._start;
         });
-        
+
         it('User must register first', async () => {
           const optionInfo_1 = await listingInstance.options(option0);
 
@@ -847,12 +872,12 @@ export const v1 = () => {
           expect(optionInfo_1._totalStake).equal(optionInfo_2._totalStake);
         });
 
-        it("User is rewarded for the time period between register timestamp and unregister timestamp",async () => {
+        it('User is rewarded for the time period between register timestamp and unregister timestamp', async () => {
           const stakingBal_1 = await ANFTInstance.balanceOf(stakingAcc.address);
           const stakeholderBal_1 = await ANFTInstance.balanceOf(stakeholder1.address);
 
-          const preDefinedUnregisterTS = stakeStart.add(86000); 
-          await ethers.provider.send("evm_setNextBlockTimestamp", [preDefinedUnregisterTS.toNumber()]);
+          const preDefinedUnregisterTS = stakeStart.add(86000);
+          await ethers.provider.send('evm_setNextBlockTimestamp', [preDefinedUnregisterTS.toNumber()]);
 
           const expectedReward = await calculateStakeHolderReward({
             stakeStart,
@@ -865,15 +890,13 @@ export const v1 = () => {
           const unregisterTx = await listingInstance.connect(stakeholder1).register(registeredAmount.div(2), option0);
           const unregisterReceipt = await unregisterTx.wait();
           const unregisterTS = (await ethers.provider.getBlock(unregisterReceipt.blockNumber)).timestamp;
-          expect(unregisterTS).equal(preDefinedUnregisterTS.toNumber())
-          
+          expect(unregisterTS).equal(preDefinedUnregisterTS.toNumber());
+
           const stakingBal_2 = await ANFTInstance.balanceOf(stakingAcc.address);
           const stakeholderBal_2 = await ANFTInstance.balanceOf(stakeholder1.address);
-          expect(stakingBal_2).equal(stakingBal_1.sub(expectedReward))
-          expect(stakeholderBal_2).equal(stakeholderBal_1.add(expectedReward))
-          
-
-        })
+          expect(stakingBal_2).equal(stakingBal_1.sub(expectedReward));
+          expect(stakeholderBal_2).equal(stakeholderBal_1.add(expectedReward));
+        });
 
         it('User Staking properties is reset to 0', async () => {
           const stakingInfo_1 = await listingInstance.stakings(option0, stakeholder1.address);

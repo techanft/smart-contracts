@@ -62,9 +62,26 @@ contract Listing is ListingStorage {
         ownership = block.timestamp;
         tokenContract = msg.sender;
     }
+    /**
+     * @dev Validator can update the listing value to reflect the real estate price in the real world
+     * Emits an {UpdateValue} event to make the changes publicly visible
+     */
+    function updateValue (uint256 _value) public onlyValidator {
+        value = _value;
+        Token(tokenContract).triggerUpdateListingValueEvent(_value);
+    }
 
     /**
-     * @dev Owner can update worker status. Which means they can choose/unchoose who
+     * @dev Validator can update the daily payment value to reflect the real estate price in the real world
+     * Emits an {UpdateDailyPayment} event to make the changes publicly visible
+     */
+    function updateDailyPayment (uint256 _dailyPayment) public onlyValidator {
+        dailyPayment = _dailyPayment;
+        Token(tokenContract).triggerUpdatePaymentEvent(_dailyPayment);
+    }
+
+    /**
+     * @dev Owner can update worker status. Which means they can choose/remove who
      * can use the listing in real world
      */
     function updateWorker(address _worker) public {
@@ -80,7 +97,7 @@ contract Listing is ListingStorage {
     * sender must be listing owner owner to extend listing ownership, OR the ownership value is in the past (current owner forfeits the listing).
     * In the forfeit case, the sender will be the new owner, and new ownership would be time credit added on top of current timestamp
     *
-    * sender must transfer at least {dailyPayment} amount (Own the listing for at least 1.0 day)
+    * sender must transfer at least {dailyPayment} amount (Owns the listing for at least 1.0 day)
     *
     * Time credit formula:
     *   C = (A  x 86400 / D)
@@ -95,9 +112,10 @@ contract Listing is ListingStorage {
     function extendOwnership (uint256 _amount) public {
         require(msg.sender == owner || ownership <  block.timestamp, "Listing: Unauth!");
         
+        require(_amount >= dailyPayment, "Listing: Insufficient amount!");
+
         bool success = Token(tokenContract).handleListingTx(msg.sender, _amount, true);
         require(success, "Listing: Unsuccessful attempt!");
-        require(_amount >= dailyPayment, "Listing: Insufficient amount!");
 
         uint256 existingOwnership = ownership;
         address existingOwner = owner;

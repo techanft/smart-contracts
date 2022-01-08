@@ -32,17 +32,18 @@ contract ListingStorage {
 
     /**
      * @dev Ownership value should be in the unix timestamp, determinating if the listing is forfeited by the owner
-     * (ownership < block/timestamp) and ready to be taken by another owner user.
+     * (ownership < block.timestamp) and ready to be taken by another owner user.
      */
     uint256 public ownership;
 
     /**
-     * @dev The market value of the listing in real world. Determined by the board, mutable by the validator
+     * @dev The market value of the listing in real world
      */
     uint256 public value;
 
     /**
-     * @dev Daily payment determines how long the owner has the ownership over the listing with the tokens they pay.
+     * @dev Daily payment is the amount of token the owner has to pay daily to maintain ownership
+     * Daily payment determines how long the owner has the ownership over the listing with the tokens they pay.
      */
     uint256 public dailyPayment;
 
@@ -99,20 +100,6 @@ contract ListingStorage {
         owner = _newOwner;
     }
     
-    /**
-     * @dev Validator can update the listing value to reflect the real estate price in the real world
-     */
-    function updateValue (uint256 _value) public onlyValidator {
-        value = _value;
-    }
-
-    /**
-     * @dev Validator can update the daily payment value to reflect the real estate price in the real world
-     */
-    function updateDailyPayment (uint256 _dailyPayment) public onlyValidator {
-        dailyPayment = _dailyPayment;
-    }
-
     /**
      * @dev Validator can update themselves
      */

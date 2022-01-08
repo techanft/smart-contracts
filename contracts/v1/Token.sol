@@ -20,11 +20,6 @@ contract Token is Initializable, ERC20Upgradeable, AccessControlUpgradeable, UUP
     address public stakingAddress;
 
     /**
-     * @dev Deployer has the default roles of DEFAULT_ADMIN_ROLE and VALIDATOR
-     * Staking address is set here
-     */
-
-    /**
      * @dev A listing address must be both `_isCreated` and `_active` to be able to operate.
      * Otherwise malicious accounts can call handleListingTx functions
      *
@@ -39,6 +34,10 @@ contract Token is Initializable, ERC20Upgradeable, AccessControlUpgradeable, UUP
     }
     mapping (address => ListingStatusModel) public listingStatus;
 
+    /**
+     * @dev Deployer has the default roles of DEFAULT_ADMIN_ROLE and VALIDATOR
+     * Staking address is set here
+     */
     function initialize(address _stakingAddr) public initializer {
 
         __UUPSUpgradeable_init();
@@ -60,8 +59,8 @@ contract Token is Initializable, ERC20Upgradeable, AccessControlUpgradeable, UUP
     /**
      * @dev Handle transactions from listings and only from listings
      * 
-     * If `_in` is true, _amount will be transfered from `_userAddr` to staking address
-     * Otherwise, `_amount` will be transfered from staking address to `_userAddr`
+     * If `_in` is true, _amount will be transfered from `_userAddr` to `stakingAddress`
+     * Otherwise, `_amount` will be transfered from `stakingAddress` to `_userAddr`
      *
      * Returns true if the transation is success
      *
@@ -82,8 +81,8 @@ contract Token is Initializable, ERC20Upgradeable, AccessControlUpgradeable, UUP
      *
      * A newly created listing is set with two properties: `_isCreated` and `_active`
      *
-     * Listing validator shall be the validator address making the transaction. Owner of the listing shall be
-     * the specified address
+     * Listing's validator is the validator address making the transaction. The validator must
+     * specify the address of listing's owner
      * 
      * Emits a {ListingCreation} event
      */
@@ -122,6 +121,14 @@ contract Token is Initializable, ERC20Upgradeable, AccessControlUpgradeable, UUP
     /**
      * @notice The below functions are to trigger listing events
      */    
+    function triggerUpdateListingValueEvent(uint _value) external onlyValidListing {
+        emit UpdateValue(_msgSender(), _value);
+    }
+
+    function triggerUpdatePaymentEvent(uint _payment) external onlyValidListing {
+        emit UpdateDailyPayment(_msgSender(), _payment);
+    }
+
     function triggerUpdateWorkerEvent(address _worker, bool _isAuthorized) external onlyValidListing {
         emit UpdateWorker(_msgSender(), _worker, _isAuthorized);
     }
@@ -179,6 +186,20 @@ contract Token is Initializable, ERC20Upgradeable, AccessControlUpgradeable, UUP
      * `_worker` is the updated address, `_isAuthorized` is the new status
      */
     event UpdateWorker(address _listing, address _worker, bool _isAuthorized);
+
+    /**
+     * @dev Emitted when the validator update listing's value
+     *
+     * `_value` is the new listing value
+     */
+    event UpdateValue (address _listing, uint256 _value);
+
+    /**
+     * @dev Emitted when the validator update listing's daily payment
+     *
+     * `_payment` is the previous listing daily payment
+     */
+    event UpdateDailyPayment (address _listing, uint256 _payment);
 
     /**
      * @dev Emitted when the owner extends ownership with a listing

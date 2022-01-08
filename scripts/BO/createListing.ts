@@ -15,7 +15,6 @@ const createListing = async (listingID: string | number, ownerAddr: string) => {
   const receipt: ContractReceipt = await tx.wait();
 
   const listingAddress = litingAddrFromListingCreationEvent(receipt.events);
-  console.log(tx.hash, 'tx.hash');
   console.log(listingAddress, 'listingAddress');
   console.log('===============================');
 };

@@ -1,3 +1,4 @@
+import { BigNumber } from 'ethers';
 import { getWalletByPK } from '../utils';
 import { TokenInstance } from './BO/grantValidatorRole';
 import { convertBnToDecimal, convertDecimalToBn } from './BO/utils';
@@ -17,12 +18,14 @@ const transferToken = async () => {
     '0x43f96726B105b448798b6eebB04a09ee99921608',
     '0x42dFeEDCD1575484DfdC84c216fAD75f3e20528D',
     '0xeA27071727822834552879E17c2320C81a1bf909',
+    '0xe1D3ED56475400f54a5Efd336C45738F37c4b7a7',
+    '0x916893E3EaeF15198DE3B527400582c2bb5D4a05'
   ];
   if (!TESTNET_DEPLOYER_PRIVATE_KEY) return;
 
   const deployerWallet = getWalletByPK(TESTNET_DEPLOYER_PRIVATE_KEY);
   const contractWithSigner = await TokenInstance.connect(deployerWallet);
-  const transferAmount = convertDecimalToBn(String(50_000_000));
+  const transferAmount = convertDecimalToBn(String(100_000_000));
 
   for (let index = 0; index < accounts.length; index++) {
     const element = accounts[index];

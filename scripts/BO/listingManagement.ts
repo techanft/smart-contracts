@@ -59,7 +59,7 @@ const massUpdateDPandValue = async () => {
     const listingInstance = new ethers.Contract(addr, listingArtifact.abi, provider);
     const contractWithValidatedSigner = listingInstance.connect(validatorWallet);
 
-    const lisingValue = convertDecimalToBn(String(getRandomInt(10000, 50000)));
+    const lisingValue = convertDecimalToBn(String(getRandomInt(50000, 100000)));
     const dailyPaymentValue = convertDecimalToBn(String(getRandomInt(20, 500)));
 
     console.log(`Listing value: ${lisingValue.toString()}`)
@@ -108,7 +108,7 @@ const massUpdateListingOptions = async () => {
 }
 
 const main = async () => {
-  // await massUpdateDPandValue();
+  await massUpdateDPandValue();
   await massUpdateListingOptions();
 }
 main().catch((error) => {

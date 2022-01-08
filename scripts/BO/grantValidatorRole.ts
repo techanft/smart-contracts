@@ -23,3 +23,6 @@ const grantValidatorRole = async (validatorAddress: string) => {
 };
 
 grantValidatorRole("0x43f96726B105b448798b6eebB04a09ee99921608")
+
+// hh run ./scripts/BO/grantValidatorRole.ts && hh run ./scripts/BO/createListing.ts
+// hh run ./scripts/BO/listingManagement.ts && hh run ./scripts/tokenActions.ts

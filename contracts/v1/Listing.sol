@@ -137,6 +137,9 @@ contract Listing is ListingStorage {
     * 
     * Owner can input the amount of token they want to withdraw
     *
+    * After withdrawal, owner still have to own the listing for at least 1.0 day more
+    * (hence the check {newOwnership >= block.timestamp.add(86400)} )
+    *
     * Ownership withdraw formula:
     *   RC = A * 86400 / D
     *   OS2 = OS1 - RC
@@ -154,12 +157,13 @@ contract Listing is ListingStorage {
     function withdraw(uint256 _amount) public {
         require(msg.sender == owner, "Listing: Unauth!");
         require(ownership >= block.timestamp, "Listing: Ownership expired!");
+        require(_amount >= dailyPayment, "Listing: Insufficient amount!");
 
         uint256 removedCreditTimestamp = _amount.mul(86400).div(dailyPayment);
         uint256 newOwnership = ownership.sub(removedCreditTimestamp);
 
-        require(newOwnership >= block.timestamp, "Listing: Invalid amount!");
-
+        require(newOwnership >= block.timestamp.add(86400), "Listing: Invalid amount!");
+        
         bool success = Token(tokenContract).handleListingTx(msg.sender, _amount, false);
         require(success, "Listing: Unsuccessful attempt!");
 

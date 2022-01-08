@@ -601,30 +601,36 @@ export const v1 = () => {
           expect(newOwnership).equal(expectedOwnershipValue);
         });
 
-        it('Owner cant withdraw more than the credit left', async () => {
+        it('Minimum withdraw amount is dailyPayment',async () => {
           await listingInstance.connect(listingOwner1).extendOwnership(extensionValues);
+          const dailyPayment = await listingInstance.dailyPayment();
+          await expect(listingInstance.connect(listingOwner1).withdraw(dailyPayment.sub(1))).to.be.revertedWith("Listing: Insufficient amount!");
+          await expect(listingInstance.connect(listingOwner1).withdraw(dailyPayment)).to.be.not.reverted;
+        })
 
-          const blockNo_1 = await ethers.provider.getBlockNumber();
-          const blockInfo_1 = await ethers.provider.getBlock(blockNo_1);
-          const blockTS_1 = blockInfo_1.timestamp;
+        it('Owner cant withdraw more than the credit left plus one day', async () => {
+          await listingInstance.connect(listingOwner1).extendOwnership(extensionValues);
+          const blockNo = await ethers.provider.getBlockNumber();
+          const blockInfo = await ethers.provider.getBlock(blockNo);
+          const blockTS = blockInfo.timestamp;
 
-          const listingOwnership_1 = await listingInstance.ownership();
-          const listingDP_1 = await listingInstance.dailyPayment();
-          const maximumTokenToWithdraw_1 = calculateAvailableTokenForWithdrawing({
-            currentBlockTS: BigNumber.from(blockTS_1),
-            existingOwnership: listingOwnership_1,
-            dailyPayment: listingDP_1,
+          const listingOwnership = await listingInstance.ownership();
+          const listingDP = await listingInstance.dailyPayment();
+          const maximumTokenToWithdraw = calculateAvailableTokenForWithdrawing({
+            currentBlockTS: BigNumber.from(blockTS),
+            existingOwnership: listingOwnership,
+            dailyPayment: listingDP,
           });
 
-          await expect(listingInstance.connect(listingOwner1).withdraw(maximumTokenToWithdraw_1)).to.be.revertedWith(
+          await expect(listingInstance.connect(listingOwner1).withdraw(maximumTokenToWithdraw)).to.be.revertedWith(
             'Listing: Invalid amount!'
           );
 
           const maximumTokenToWithdraw_2 = calculateAvailableTokenForWithdrawing({
-            // // Add 5 more minutes to create a difference
-            currentBlockTS: BigNumber.from(blockTS_1).add(300),
-            existingOwnership: listingOwnership_1.add(60),
-            dailyPayment: listingDP_1,
+            // Add 10 seconds to create a difference
+            currentBlockTS: BigNumber.from(blockTS).add(10),
+            existingOwnership: listingOwnership,
+            dailyPayment: listingDP,
           });
 
           await expect(listingInstance.connect(listingOwner1).withdraw(maximumTokenToWithdraw_2)).to.be.not.reverted;
@@ -701,7 +707,6 @@ export const v1 = () => {
           expect(ownership_1).equal(ownership_2);
         });
       });
-
       describe('Users register for staking', () => {
         const suppliedAmountForStakingAddress = tokenAmountBN(50_000);
         const rewardPoolAmount = tokenAmountBN(10_000);
@@ -1345,35 +1350,34 @@ export const v1 = () => {
             expect(newOwnership).equal(expectedOwnershipValue);
           });
 
-          it('Owner cant withdraw more than the credit left', async () => {
+          it('Owner cant withdraw more than the credit left plus one day', async () => {
             await listingInstance.connect(listingOwner1).extendOwnership(extensionValues);
+            const blockNo = await ethers.provider.getBlockNumber();
+            const blockInfo = await ethers.provider.getBlock(blockNo);
+            const blockTS = blockInfo.timestamp;
 
-            const blockNo_1 = await ethers.provider.getBlockNumber();
-            const blockInfo_1 = await ethers.provider.getBlock(blockNo_1);
-            const blockTS_1 = blockInfo_1.timestamp;
-
-            const listingOwnership_1 = await listingInstance.ownership();
-            const listingDP_1 = await listingInstance.dailyPayment();
-            const maximumTokenToWithdraw_1 = calculateAvailableTokenForWithdrawing({
-              currentBlockTS: BigNumber.from(blockTS_1),
-              existingOwnership: listingOwnership_1,
-              dailyPayment: listingDP_1,
+            const listingOwnership = await listingInstance.ownership();
+            const listingDP = await listingInstance.dailyPayment();
+            const maximumTokenToWithdraw = calculateAvailableTokenForWithdrawing({
+              currentBlockTS: BigNumber.from(blockTS),
+              existingOwnership: listingOwnership,
+              dailyPayment: listingDP,
             });
 
-            await expect(listingInstance.connect(listingOwner1).withdraw(maximumTokenToWithdraw_1)).to.be.revertedWith(
+            await expect(listingInstance.connect(listingOwner1).withdraw(maximumTokenToWithdraw)).to.be.revertedWith(
               'Listing: Invalid amount!'
             );
 
             const maximumTokenToWithdraw_2 = calculateAvailableTokenForWithdrawing({
-              // // Add 5 more minutes to create a difference
-              currentBlockTS: BigNumber.from(blockTS_1).add(300),
-              existingOwnership: listingOwnership_1.add(60),
-              dailyPayment: listingDP_1,
+              // Add 10 seconds to create a difference
+              currentBlockTS: BigNumber.from(blockTS).add(10),
+              existingOwnership: listingOwnership,
+              dailyPayment: listingDP,
             });
 
             await expect(listingInstance.connect(listingOwner1).withdraw(maximumTokenToWithdraw_2)).to.be.not.reverted;
           });
-
+          
           it('Cant withdraw with insufficient funds balance', async () => {
             await listingInstance.connect(listingOwner1).extendOwnership(extensionValues);
 

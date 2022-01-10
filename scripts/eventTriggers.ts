@@ -61,7 +61,6 @@ const register = async () => {
 const claimReward = async () => {
   const contractWithSigner = listingInstance.connect(shWallet);
 
-  const rewardPoolBefore = await listingInstance.rewardPool();
   const optionInfoBefore = await contractWithSigner.options(option);
 
   const { _start } = await listingInstance.stakings(option, shWallet.address);
@@ -69,7 +68,6 @@ const claimReward = async () => {
   console.log(`optionInfoBefore._reward: ${optionInfoBefore._reward.toNumber()}`);
   console.log(`optionInfoBefore._totalStake: ${convertBnToDecimal(optionInfoBefore._totalStake)}`);
 
-  console.log(`rewardPoolBefore: ${convertBnToDecimal(rewardPoolBefore)}`);
 
   const claimTx = await contractWithSigner.claimReward(option);
   const claimReceipt = await claimTx.wait();
@@ -80,12 +78,10 @@ const claimReward = async () => {
 
   console.log(`claimHash: ${claimTx.hash}`)
 
-  const rewardPoolAfter = await listingInstance.rewardPool();
   const optionInfoAfter = await contractWithSigner.options(option);
   
   console.log(`optionInfoAfter._reward: ${(optionInfoAfter._reward).toNumber()}`);
   console.log(`optionInfoAfter._totalStake: ${convertBnToDecimal(optionInfoAfter._totalStake)}`);
-  console.log(`rewardPoolAfter: ${convertBnToDecimal(rewardPoolAfter)}`);
 
 };
 const checkingReward = async () => {

@@ -64,6 +64,7 @@ const config: HardhatUserConfig = {
   namedAccounts: {
     deployer: 0,
     stakingAddress: 1,
+    reService: "0x33aE0695fB3250F0788510B289d26309d4B8f939"
   },
 };
 

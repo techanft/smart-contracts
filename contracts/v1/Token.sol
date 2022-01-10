@@ -35,16 +35,44 @@ contract Token is Initializable, ERC20Upgradeable, AccessControlUpgradeable, UUP
     mapping (address => ListingStatusModel) public listingStatus;
 
     /**
+     * @dev Initial token distribution addresses according to whitepaper (page 11/24)
+     * https://anft.vn/assets/file/ANFTWhitepaperVer1.0.pdf
+     */
+    address public PLATFORM_DEVELOPMENT;
+    address public COMMUNITY;
+    address public REAL_ESTATE_SERVICE;
+    address public ETF;
+    address public REGULATION_FUNDS;
+
+    /**
      * @dev Deployer has the default roles of DEFAULT_ADMIN_ROLE and VALIDATOR
      * Staking address is set here
+     * 
+     * Initial token distribution addresses are also set here since variables can't be initialized outsize 
+     * initialize function
      */
+
     function initialize(address _stakingAddr) public initializer {
+        require(_stakingAddr != address(0), "Token: Invalid _stakingAddr");
 
         __UUPSUpgradeable_init();
         __AccessControl_init();
         __ERC20_init("ANFT Token", "ANFT");
 
-        _mint(_msgSender(),  1232000000 * 10 ** decimals());
+        uint256 totalSuppy = 1_232_000_000 * 10 ** decimals();
+
+        PLATFORM_DEVELOPMENT = 0xb3F5E20db0167d4A5B5C5DaAd6f1c76Cc40cC52D;
+        COMMUNITY = 0x6b3887eB6091cC705ffA6E32e22B5524b3A9BEa4;
+        REAL_ESTATE_SERVICE = 0x33aE0695fB3250F0788510B289d26309d4B8f939;
+        ETF = 0xf5d2f60663D83ABf28969F2A5F501178D8D64bAa;
+        REGULATION_FUNDS = 0x9F1660B7184Bde8b8973c6618AC3D7D306e8a796;
+
+        _mint(PLATFORM_DEVELOPMENT,  totalSuppy * 14 / 100);
+        _mint(COMMUNITY,  totalSuppy * 34 / 100);
+        _mint(REAL_ESTATE_SERVICE,  totalSuppy * 32 / 100);
+        _mint(ETF,  totalSuppy * 8 / 100);
+        _mint(REGULATION_FUNDS,  totalSuppy * 12 / 100);
+
         stakingAddress = _stakingAddr;
         _setupRole(DEFAULT_ADMIN_ROLE, _msgSender());
         _setupRole(VALIDATOR, _msgSender());
@@ -67,6 +95,7 @@ contract Token is Initializable, ERC20Upgradeable, AccessControlUpgradeable, UUP
      * Emits a {Transfer} event from IERC20
      */
     function handleListingTx (address _userAddr, uint256 _amount, bool _in)  external onlyValidListing returns (bool) {
+        require(_userAddr != address(0), "Token: Invalid _userAddr");
         address sender;
         address recipient;
         (sender, recipient) = _in ? (_userAddr, stakingAddress) : (stakingAddress, _userAddr);

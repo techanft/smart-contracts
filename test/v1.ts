@@ -1,7 +1,7 @@
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/dist/src/signers';
 import { expect } from 'chai';
 import { BigNumber, ContractReceipt } from 'ethers';
-import { ethers, upgrades } from 'hardhat';
+import { ethers, getNamedAccounts, upgrades } from 'hardhat';
 import { convertBnToDecimal } from '../scripts/BO/utils';
 import { Listing, Listing__factory, TestUpgrade, TestUpgrade__factory, Token, Token__factory } from '../typechain';
 import {
@@ -24,7 +24,8 @@ export const v1 = () => {
       listingOwner2: SignerWithAddress,
       worker1: SignerWithAddress,
       validator: SignerWithAddress,
-      validator2: SignerWithAddress;
+      validator2: SignerWithAddress,
+      reService: SignerWithAddress;
     let ANFTFactory: Token__factory;
     let ANFTInstance: Token;
     let ANFTAddress: string;
@@ -55,6 +56,22 @@ export const v1 = () => {
       await ANFTInstance.connect(deployer).grantRole(VALIDATOR, validator.address);
     });
 
+    beforeEach(async () => {
+      const { reService: reServiceAddress } = await getNamedAccounts();
+      reService = await ethers.getSigner(reServiceAddress);
+
+      const tx = await deployer.sendTransaction({
+        to: reService.address,
+        value: ethers.utils.parseEther('100'),
+      });
+
+      await tx.wait();
+
+      // Transfering all reService's balance to deployer's to proceed test cases
+      const reServiceBalance = await ANFTInstance.balanceOf(reService.address);
+      await ANFTInstance.connect(reService).transfer(deployer.address, reServiceBalance);
+    });
+
     describe('Deployment', function () {
       it('deployer account has the DEFAULT_ADMIN_ROLE ', async () => {
         // console.log(ANFTInstance.address, 'ANFTInstance.address');
@@ -79,6 +96,31 @@ export const v1 = () => {
         expect(await ANFTInstance.totalSupply()).to.equal(
           BigNumber.from(1_232_000_000).mul(BigNumber.from(10).pow(decimals))
         );
+      });
+
+      it('Should allocate right amount of token to correct addresses', async () => {
+        const PLATFORM_DEVELOPMENT = '0xb3F5E20db0167d4A5B5C5DaAd6f1c76Cc40cC52D';
+        const COMMUNITY = '0x6b3887eB6091cC705ffA6E32e22B5524b3A9BEa4';
+        const REAL_ESTATE_SERVICE = '0x33aE0695fB3250F0788510B289d26309d4B8f939';
+        const ETF = '0xf5d2f60663D83ABf28969F2A5F501178D8D64bAa';
+        const REGULATION_FUNDS = '0x9F1660B7184Bde8b8973c6618AC3D7D306e8a796';
+
+        expect(await ANFTInstance.PLATFORM_DEVELOPMENT()).equal(PLATFORM_DEVELOPMENT);
+        expect(await ANFTInstance.COMMUNITY()).equal(COMMUNITY);
+        expect(await ANFTInstance.REAL_ESTATE_SERVICE()).equal(REAL_ESTATE_SERVICE);
+        expect(await ANFTInstance.ETF()).equal(ETF);
+        expect(await ANFTInstance.REGULATION_FUNDS()).equal(REGULATION_FUNDS);
+
+        const totalSupply = await ANFTInstance.totalSupply();
+
+        expect(await ANFTInstance.balanceOf(PLATFORM_DEVELOPMENT)).equal(totalSupply.mul(14).div(100));
+        expect(await ANFTInstance.balanceOf(COMMUNITY)).equal(totalSupply.mul(34).div(100));
+
+        // We previously transfer all REAL_ESTATE_SERVICE's balance to deployer to proceed test cases
+        expect(await ANFTInstance.balanceOf(deployer.address)).equal(totalSupply.mul(32).div(100));
+
+        expect(await ANFTInstance.balanceOf(ETF)).equal(totalSupply.mul(8).div(100));
+        expect(await ANFTInstance.balanceOf(REGULATION_FUNDS)).equal(totalSupply.mul(12).div(100));
       });
     });
 
@@ -601,12 +643,14 @@ export const v1 = () => {
           expect(newOwnership).equal(expectedOwnershipValue);
         });
 
-        it('Minimum withdraw amount is dailyPayment',async () => {
+        it('Minimum withdraw amount is dailyPayment', async () => {
           await listingInstance.connect(listingOwner1).extendOwnership(extensionValues);
           const dailyPayment = await listingInstance.dailyPayment();
-          await expect(listingInstance.connect(listingOwner1).withdraw(dailyPayment.sub(1))).to.be.revertedWith("Listing: Insufficient amount!");
+          await expect(listingInstance.connect(listingOwner1).withdraw(dailyPayment.sub(1))).to.be.revertedWith(
+            'Listing: Insufficient amount!'
+          );
           await expect(listingInstance.connect(listingOwner1).withdraw(dailyPayment)).to.be.not.reverted;
-        })
+        });
 
         it('Owner cant withdraw more than the credit left plus one day', async () => {
           await listingInstance.connect(listingOwner1).extendOwnership(extensionValues);
@@ -1377,7 +1421,7 @@ export const v1 = () => {
 
             await expect(listingInstance.connect(listingOwner1).withdraw(maximumTokenToWithdraw_2)).to.be.not.reverted;
           });
-          
+
           it('Cant withdraw with insufficient funds balance', async () => {
             await listingInstance.connect(listingOwner1).extendOwnership(extensionValues);
 

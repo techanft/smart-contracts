@@ -1,7 +1,7 @@
 import { BigNumber } from 'ethers';
 import { Listing } from '../typechain';
 import { Event } from '@ethersproject/contracts';
-import { convertBnToDecimal } from '../scripts/BO/utils';
+import { convertBnToDecimal, convertDecimalToBn } from '../scripts/BO/utils';
 
 export const litingAddrFromListingCreationEvent = (events: Event[] | undefined): string => {
   const ListingCreatedEvent = events?.find(({ event }) => event == 'ListingCreation');
@@ -95,20 +95,24 @@ export const calculateStakeHolderReward = async ({
   const dailyPayment = await instance.dailyPayment();
   const listingValue = await instance.value();
 
-  let T = totalStake.mul(100).div(listingValue);
+  const safeMul = convertDecimalToBn('1');
+
+  let T = totalStake.mul(safeMul).div(listingValue);
+
+  // let T = totalStake.mul(100).div(listingValue);
 
   const T_Threshold = BigNumber.from(86);
   const expiredOwnershipThreshold = BigNumber.from(50);
 
-  if (T.gt(T_Threshold)) {
-    T = T_Threshold;
+  if (T.gt(safeMul.mul(T_Threshold).div(100))) {
+    T = safeMul.mul(T_Threshold).div(100);
   }
 
-  if (ownership < blockTS && T.gt(expiredOwnershipThreshold)) {
-    T = expiredOwnershipThreshold;
+  if (ownership < blockTS && T.gt(safeMul.mul(expiredOwnershipThreshold).div(100))) {
+    T = expiredOwnershipThreshold.mul(safeMul.div(100));
   }
 
-  const RTd = dailyPayment.mul(T).div(100);
+  const RTd = dailyPayment.mul(T).div(safeMul);
   const above = RTd.mul(optionInfo._reward.toNumber()).div(100);
   const At = optionInfo._totalStake;
   const Ax = userStake._amount;

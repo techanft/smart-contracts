@@ -25,7 +25,7 @@ const transferToken = async () => {
 
   const deployerWallet = getWalletByPK(TESTNET_DEPLOYER_PRIVATE_KEY);
   const contractWithSigner = await TokenInstance.connect(deployerWallet);
-  const transferAmount = convertDecimalToBn(String(100_000_000));
+  const transferAmount = convertDecimalToBn(String(10_000_000));
 
   for (let index = 0; index < accounts.length; index++) {
     const element = accounts[index];

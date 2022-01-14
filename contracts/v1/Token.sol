@@ -50,6 +50,8 @@ contract Token is Initializable, ERC20Upgradeable, AccessControlUpgradeable, UUP
      * 
      * Initial token distribution addresses are also set here since variables can't be initialized outsize 
      * initialize function
+     *
+     * After deployment, deployer account should be moved to an multisign account
      */
 
     function initialize(address _stakingAddr) public initializer {
@@ -126,14 +128,15 @@ contract Token is Initializable, ERC20Upgradeable, AccessControlUpgradeable, UUP
     /**
      * @dev Toggle listing `_active` status. Shall be useful if there's a listing no longer in operation
      *
-     * Restricted to only validators
+     * Restricted to only the validator of the listing or DEFAULT_ADMIN_ROLE
      *
      * The `_listingAddr` must be the address of a created listing
      * 
      */
     function toggleListingStatus (address _listingAddr) public {
-        require(hasRole(VALIDATOR, _msgSender()), "Token: Unauthorized");
         require(listingStatus[_listingAddr]._isCreated, "Token: Invalid Listing");
+        address listingValidator = Listing(_listingAddr).validator();
+        require(listingValidator == _msgSender() || hasRole(DEFAULT_ADMIN_ROLE, _msgSender()), "Token: Unauthorized");
         listingStatus[_listingAddr]._active = !listingStatus[_listingAddr]._active;
     }
 
@@ -145,6 +148,15 @@ contract Token is Initializable, ERC20Upgradeable, AccessControlUpgradeable, UUP
         require(hasRole(DEFAULT_ADMIN_ROLE, _msgSender()), "Token: Unauthorized");
         stakingAddress = _stakingAddr;
         emit UpdateStakingAddr(_stakingAddr);
+    }
+
+    /**
+     * @dev In case a validator's key is compromised, {DEFAULT_ADMIN_ROLE} 
+     * is able to update listing's validator
+     */    
+    function emergencyUpdateListingValidator (address _listingAddr, address _newValidator) public {
+        require(hasRole(DEFAULT_ADMIN_ROLE, _msgSender()), "Token: Unauthorized");
+        Listing(_listingAddr).updateValidator(_newValidator);
     }
 
     /**

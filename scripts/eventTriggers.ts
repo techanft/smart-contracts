@@ -4,7 +4,7 @@ import provider from './BO/provider';
 import { getWalletByPK } from '../utils';
 import { convertBnToDecimal, convertDecimalToBn, listingAddrs } from './BO/utils';
 import { Listing } from '../typechain';
-import { TokenInstance } from './BO/grantValidatorRole';
+import { TokenInstance } from './BO/manageRoles';
 import { calculateStakeHolderReward, getCurrentUnix } from '../test/utils';
 
 const [first, second, third, fourth, fifth, sixth, seventh, eighth] = listingAddrs;

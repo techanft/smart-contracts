@@ -1,7 +1,7 @@
 import { ContractReceipt } from 'ethers';
 import { litingAddrFromListingCreationEvent } from '../../test/utils';
 import { getWalletByPK } from '../../utils';
-import { TokenInstance } from './grantValidatorRole';
+import { TokenInstance } from './manageRoles';
 
 const { VALIDATOR_PK } = process.env;
 

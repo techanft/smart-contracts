@@ -1,6 +1,6 @@
 import { BigNumber } from 'ethers';
 import { getWalletByPK } from '../utils';
-import { TokenInstance } from './BO/grantValidatorRole';
+import { TokenInstance } from './BO/manageRoles';
 import { convertBnToDecimal, convertDecimalToBn } from './BO/utils';
 
 const { TESTNET_DEPLOYER_PRIVATE_KEY } = process.env;

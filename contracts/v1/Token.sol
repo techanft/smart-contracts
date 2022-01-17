@@ -15,6 +15,16 @@ contract Token is Initializable, ERC20Upgradeable, AccessControlUpgradeable, UUP
     bytes32 public constant VALIDATOR = keccak256("VALIDATOR");
 
     /**
+     * @dev Burners are authorized accounts to burn tokens from their own accounts
+     */
+    bytes32 public constant BURNER = keccak256("BURNER");
+
+    /**
+     * @dev Minters are authorized accounts to mint tokens
+     */
+    bytes32 public constant MINTER = keccak256("MINTER");
+
+    /**
      * @dev The funds address for paying out rewards and receiving payments
      */
     address public stakingAddress;
@@ -76,8 +86,7 @@ contract Token is Initializable, ERC20Upgradeable, AccessControlUpgradeable, UUP
         _mint(REGULATION_FUNDS,  totalSuppy * 12 / 100);
 
         stakingAddress = _stakingAddr;
-        _setupRole(DEFAULT_ADMIN_ROLE, _msgSender());
-        _setupRole(VALIDATOR, _msgSender());
+        _grantRole(DEFAULT_ADMIN_ROLE, _msgSender());
     }
 
     function _authorizeUpgrade(address newImplementation)
@@ -157,6 +166,25 @@ contract Token is Initializable, ERC20Upgradeable, AccessControlUpgradeable, UUP
     function emergencyUpdateListingValidator (address _listingAddr, address _newValidator) public {
         require(hasRole(DEFAULT_ADMIN_ROLE, _msgSender()), "Token: Unauthorized");
         Listing(_listingAddr).updateValidator(_newValidator);
+    }
+
+    /**
+     * @dev Destroys `amount` tokens from the authorized caller.
+     *
+     * See {ERC20-_burn}.
+     */
+    function burn(uint256 amount) public onlyRole(BURNER) {
+        _burn(_msgSender(), amount);
+    }
+
+    /**
+     * @dev Mints `amount` tokens for the authorized caller
+     *
+     * See {ERC20-_mint}.
+     */
+
+    function mint(address to, uint256 amount) public onlyRole(MINTER) {
+        _mint(to, amount);
     }
 
     /**

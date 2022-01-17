@@ -2,15 +2,10 @@ import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/dist/src/signers';
 import { expect } from 'chai';
 import { BigNumber, ContractReceipt } from 'ethers';
 import { ethers, getNamedAccounts, upgrades } from 'hardhat';
-import { convertBnToDecimal } from '../scripts/BO/utils';
 import { Listing, Listing__factory, TestUpgrade, TestUpgrade__factory, Token, Token__factory } from '../typechain';
 import {
-  tokenAmountBN,
-  litingAddrFromListingCreationEvent,
-  calculateOwnershipExtension,
-  calculateAvailableTokenForWithdrawing,
-  calculateStakeHolderReward,
-  calNewOwnershipAfterWithdraw,
+  calculateAvailableTokenForWithdrawing, calculateOwnershipExtension, calculateStakeHolderReward,
+  calNewOwnershipAfterWithdraw, litingAddrFromListingCreationEvent, tokenAmountBN
 } from './utils';
 
 export const v1 = () => {
@@ -25,7 +20,9 @@ export const v1 = () => {
       worker1: SignerWithAddress,
       validator: SignerWithAddress,
       validator2: SignerWithAddress,
-      reService: SignerWithAddress;
+      reService: SignerWithAddress,
+      burner: SignerWithAddress,
+      minter: SignerWithAddress;
     let ANFTFactory: Token__factory;
     let ANFTInstance: Token;
     let ANFTAddress: string;
@@ -42,6 +39,8 @@ export const v1 = () => {
         listingOwner1,
         listingOwner2,
         worker1,
+        minter,
+        burner
       ] = await ethers.getSigners();
 
       ANFTFactory = await ethers.getContractFactory('Token');
@@ -74,13 +73,8 @@ export const v1 = () => {
     
     describe('Deployment', function () {
       it('deployer account has the DEFAULT_ADMIN_ROLE ', async () => {
-        // console.log(ANFTInstance.address, 'ANFTInstance.address');
         const DEFAULT_ADMIN_ROLE = await ANFTInstance.DEFAULT_ADMIN_ROLE();
         expect(await ANFTInstance.hasRole(DEFAULT_ADMIN_ROLE, deployer.address)).to.be.true;
-      });
-      it('deployer account has the VALIDATOR role', async () => {
-        const VALIDATOR = await ANFTInstance.VALIDATOR();
-        expect(await ANFTInstance.hasRole(VALIDATOR, deployer.address)).to.be.true;
       });
 
       it('Token has 18 decimals', async () => {
@@ -122,6 +116,75 @@ export const v1 = () => {
         expect(await ANFTInstance.balanceOf(ETF)).equal(totalSupply.mul(8).div(100));
         expect(await ANFTInstance.balanceOf(REGULATION_FUNDS)).equal(totalSupply.mul(12).div(100));
       });
+
+      it('Address with {DEFAULT_ADMIN_ROLE} is able to grantRole for {MINTER} and {BURNER}',async () => {
+        const DEFAULT_ADMIN_ROLE = await ANFTInstance.DEFAULT_ADMIN_ROLE();
+        expect(await ANFTInstance.hasRole(DEFAULT_ADMIN_ROLE, deployer.address)).to.be.true;
+        expect(await ANFTInstance.hasRole(DEFAULT_ADMIN_ROLE, listingOwner1.address)).to.be.false;
+
+        const MINTER_ROLE = await ANFTInstance.MINTER();
+        const BURNER_ROLE = await ANFTInstance.BURNER();
+
+        expect(await ANFTInstance.hasRole(MINTER_ROLE, stakeholder1.address)).to.be.false;
+        expect(await ANFTInstance.hasRole(BURNER_ROLE, stakeholder2.address)).to.be.false;
+
+        await expect(ANFTInstance.connect(listingOwner1).grantRole(MINTER_ROLE, stakeholder1.address)).to.be.reverted;
+        await expect(ANFTInstance.connect(listingOwner1).grantRole(BURNER_ROLE, stakeholder2.address)).to.be.reverted;
+
+        await expect(ANFTInstance.connect(deployer).grantRole(MINTER_ROLE, stakeholder1.address)).to.be.not.reverted;
+        await expect(ANFTInstance.connect(deployer).grantRole(BURNER_ROLE, stakeholder2.address)).to.be.not.reverted;
+
+        expect(await ANFTInstance.hasRole(MINTER_ROLE, stakeholder1.address)).to.be.true;
+        expect(await ANFTInstance.hasRole(BURNER_ROLE, stakeholder2.address)).to.be.true;        
+      });
+
+      it('Only authorized minter can mint, and balance, totalSupply is updated after minting', async () => {
+        const MINTER_ROLE = await ANFTInstance.MINTER();
+
+        const minterBal_1 = await ANFTInstance.balanceOf(stakeholder1.address);
+        const totalSupply_1 = await ANFTInstance.totalSupply();
+        const mintAmount = tokenAmountBN(1000);
+
+        await expect(ANFTInstance.connect(minter).mint(stakeholder1.address, mintAmount)).to.be.reverted;
+        const minterBal_2 = await ANFTInstance.balanceOf(stakeholder1.address);
+        const totalSupply_2 = await ANFTInstance.totalSupply();
+        expect(minterBal_1).to.equal(minterBal_2);
+        expect(totalSupply_1).to.equal(totalSupply_2);
+
+        await expect(ANFTInstance.connect(deployer).grantRole(MINTER_ROLE, minter.address)).to.be.not.reverted;
+        await expect(ANFTInstance.connect(minter).mint(stakeholder1.address, mintAmount)).to.be.not.reverted;
+        const minterBal_3 = await ANFTInstance.balanceOf(stakeholder1.address);
+        const totalSupply_3 = await ANFTInstance.totalSupply();
+        expect(minterBal_2).to.equal(minterBal_3.sub(mintAmount));
+        expect(totalSupply_2).to.equal(totalSupply_3.sub(mintAmount));
+      })
+
+      it('Only authorized burner can burn, and balance, totalSupply is updated after burning', async () => {
+        const BURNER_ROLE = await ANFTInstance.BURNER();
+
+        // Make a transfer first, make sure burner has enough token to burn;
+        const burnAmount = tokenAmountBN(1000);
+        await ANFTInstance.transfer(burner.address, burnAmount);
+
+        const burnerBal_1 = await ANFTInstance.balanceOf(burner.address);
+        const totalSupply_1 = await ANFTInstance.totalSupply();
+
+        await expect(ANFTInstance.connect(burner).burn(burnAmount)).to.be.reverted;
+        const burnerBal_2 = await ANFTInstance.balanceOf(burner.address);
+        const totalSupply_2 = await ANFTInstance.totalSupply();
+
+        expect(burnerBal_1).to.equal(burnerBal_2);
+        expect(totalSupply_1).to.equal(totalSupply_2);
+
+        await expect(ANFTInstance.connect(deployer).grantRole(BURNER_ROLE, burner.address)).to.be.not.reverted;
+        await expect(ANFTInstance.connect(burner).burn(burnAmount)).to.be.not.reverted;
+        const burnerBal_3 = await ANFTInstance.balanceOf(burner.address);
+        const totalSupply_3 = await ANFTInstance.totalSupply();
+        expect(burnerBal_2).to.equal(burnerBal_3.add(burnAmount));
+        expect(totalSupply_2).to.equal(totalSupply_3.add(burnAmount));
+
+        await expect(ANFTInstance.connect(burner).burn(burnAmount)).to.be.revertedWith("ERC20: burn amount exceeds balance");
+      })
 
     });
 
@@ -1245,8 +1308,6 @@ export const v1 = () => {
       it('Roles stay the same after upgrade', async () => {
         const VALIDATOR = await ANFTInstance.VALIDATOR();
 
-        expect(await ANFTInstance.hasRole(VALIDATOR, deployer.address)).to.be.true;
-
         expect(await ANFTInstance.hasRole(VALIDATOR, validator2.address)).to.be.false;
         await ANFTInstance.connect(deployer).grantRole(VALIDATOR, validator2.address);
         expect(await ANFTInstance.hasRole(VALIDATOR, validator2.address)).to.be.true;
@@ -1298,403 +1359,6 @@ export const v1 = () => {
         expect(Owner2_Bal_2).equal(Owner2_Bal_3);
       });
 
-      describe('Listing functions works as expected', () => {
-        let Listing__factory: Listing__factory;
-        let listingInstance: Listing;
-        let listingAddress: string;
-
-        let option0Reward: number = 30;
-        let listingValue: BigNumber = tokenAmountBN(420_000);
-        let dailyPayment: BigNumber = tokenAmountBN(2_000);
-        let listingCreationBlock: number;
-        const extensionValues = tokenAmountBN(30_000);
-        const listingId = 1;
-
-        beforeEach(async () => {
-          // DEFAULT SETUP FOR LISTING CREATION
-          Listing__factory = await ethers.getContractFactory('Listing');
-
-          const listingCreationData = await ANFTInstance.connect(validator).createListing(
-            listingOwner1.address,
-            listingId
-          );
-          const receipt: ContractReceipt = await listingCreationData.wait();
-          listingCreationBlock = receipt.blockNumber;
-
-          listingAddress = litingAddrFromListingCreationEvent(receipt.events);
-          listingInstance = await Listing__factory.attach(listingAddress);
-
-          await listingInstance.connect(validator).setupOptionReward(0, option0Reward);
-          await listingInstance.connect(validator).updateValue(listingValue);
-          await listingInstance.connect(validator).updateDailyPayment(dailyPayment);
-
-          await ANFTInstance.transfer(stakeholder1.address, tokenAmountBN(10_000_000));
-          await ANFTInstance.transfer(stakeholder2.address, tokenAmountBN(20_000_000));
-          await ANFTInstance.transfer(listingOwner1.address, tokenAmountBN(30_000_000));
-          await ANFTInstance.transfer(listingOwner2.address, tokenAmountBN(40_000_000));
-        });
-
-        beforeEach(async () => {
-          upgradeFactory = await ethers.getContractFactory('TestUpgrade');
-          upgradeInstance = <TestUpgrade>await upgrades.upgradeProxy(ANFTInstance, upgradeFactory);
-        });
-
-        describe('Ownership extension', () => {
-          it('Staking address got increased by extension value', async () => {
-            const SA_Bal_1 = await upgradeInstance.balanceOf(stakingAcc.address);
-            const extensionTx = await listingInstance.connect(listingOwner1).extendOwnership(extensionValues);
-            await extensionTx.wait();
-            const SA_Bal_2 = await upgradeInstance.balanceOf(stakingAcc.address);
-            expect(SA_Bal_2).equal(SA_Bal_1.add(extensionValues));
-          });
-
-          it('Initial ownership value in the past => credit is added on current block.timestamp', async () => {
-            const initialOwnership_1 = await listingInstance.ownership();
-            const extensionTx = await listingInstance.connect(listingOwner1).extendOwnership(extensionValues);
-            const extensionReceipt = await extensionTx.wait();
-            const extendOwnershipBlockTimeStamp = (await ethers.provider.getBlock(extensionReceipt.blockNumber))
-              .timestamp;
-            expect(initialOwnership_1.toNumber() < extendOwnershipBlockTimeStamp);
-
-            const expectedExtenstionValue = await calculateOwnershipExtension({
-              initialOwnership: initialOwnership_1.toNumber(),
-              instance: listingInstance,
-              transferedAmount: extensionValues,
-              blockTS: extendOwnershipBlockTimeStamp,
-            });
-
-            const newOwnershipValue = await listingInstance.ownership();
-
-            expect(expectedExtenstionValue._end).equal(newOwnershipValue);
-          });
-
-          it('Initial value in the future, ownership extension is added up on top of existing ownership', async () => {
-            //  Make a transaction first, ensuring the the ownership value is in the future
-            await listingInstance.connect(listingOwner1).extendOwnership(extensionValues);
-            await listingInstance.connect(listingOwner1).extendOwnership(extensionValues.mul(2));
-
-            const initialOwnership = await listingInstance.ownership();
-            const extensionValue_2 = tokenAmountBN(50_000);
-
-            const extensionTx_2 = await listingInstance.connect(listingOwner1).extendOwnership(extensionValue_2);
-            const extensionReceipt_2 = await extensionTx_2.wait();
-            const extendOwnershipBlockTimeStamp_2 = (await ethers.provider.getBlock(extensionReceipt_2.blockNumber))
-              .timestamp;
-
-            // Make sure ownership value has to be in the future
-            expect(initialOwnership.toNumber() >= extendOwnershipBlockTimeStamp_2);
-
-            const expectedExtenstionValue_2 = await calculateOwnershipExtension({
-              initialOwnership: initialOwnership.toNumber(),
-              instance: listingInstance,
-              transferedAmount: extensionValue_2,
-              blockTS: extendOwnershipBlockTimeStamp_2,
-            });
-
-            const newOwnershipValue_2 = await listingInstance.ownership();
-
-            expect(expectedExtenstionValue_2._end).equal(newOwnershipValue_2);
-          });
-        });
-
-        describe('Ownership withdrawal', () => {
-          const withdrawAmount = tokenAmountBN(10_000);
-          it('Must be the listing owner to withdraw', async () => {
-            const listingOwner = await listingInstance.owner();
-            expect(listingOwner).equal(listingOwner1.address);
-            expect(listingOwner).not.equal(listingOwner2.address);
-
-            await expect(listingInstance.connect(listingOwner2).withdraw(withdrawAmount)).to.be.revertedWith(
-              'Listing: Unauth!'
-            );
-          });
-
-          it('Ownership value must not be in the past', async () => {
-            await expect(listingInstance.connect(listingOwner1).withdraw(withdrawAmount)).to.be.revertedWith(
-              'Listing: Ownership expired!'
-            );
-          });
-
-          it('Ownership value will be recalculated based on withdraw amount', async () => {
-            await listingInstance.connect(listingOwner1).extendOwnership(extensionValues);
-            const intialOwnership = await listingInstance.ownership();
-            const dailyPayment = await listingInstance.dailyPayment();
-            await listingInstance.connect(listingOwner1).withdraw(withdrawAmount);
-            const expectedOwnershipValue = calNewOwnershipAfterWithdraw({
-              withdrawAmount,
-              existingOwnership: intialOwnership,
-              dailyPayment,
-            });
-
-            const newOwnership = await listingInstance.ownership();
-            expect(newOwnership).equal(expectedOwnershipValue);
-          });
-
-          it('Owner cant withdraw more than the credit left plus one day', async () => {
-            await listingInstance.connect(listingOwner1).extendOwnership(extensionValues);
-            const blockNo = await ethers.provider.getBlockNumber();
-            const blockInfo = await ethers.provider.getBlock(blockNo);
-            const blockTS = blockInfo.timestamp;
-
-            const listingOwnership = await listingInstance.ownership();
-            const listingDP = await listingInstance.dailyPayment();
-            const maximumTokenToWithdraw = calculateAvailableTokenForWithdrawing({
-              currentBlockTS: BigNumber.from(blockTS),
-              existingOwnership: listingOwnership,
-              dailyPayment: listingDP,
-            });
-
-            await expect(listingInstance.connect(listingOwner1).withdraw(maximumTokenToWithdraw)).to.be.revertedWith(
-              'Listing: Invalid amount!'
-            );
-
-            const maximumTokenToWithdraw_2 = calculateAvailableTokenForWithdrawing({
-              // Add 10 seconds to create a difference
-              currentBlockTS: BigNumber.from(blockTS).add(10),
-              existingOwnership: listingOwnership,
-              dailyPayment: listingDP,
-            });
-
-            await expect(listingInstance.connect(listingOwner1).withdraw(maximumTokenToWithdraw_2)).to.be.not.reverted;
-          });
-
-          it('Cant withdraw with insufficient funds balance', async () => {
-            await listingInstance.connect(listingOwner1).extendOwnership(extensionValues);
-
-            const fundsBalance = await upgradeInstance.balanceOf(stakingAcc.address);
-            await upgradeInstance.connect(stakingAcc).transfer(stakingAcc2.address, fundsBalance);
-
-            await expect(listingInstance.connect(listingOwner1).withdraw(withdrawAmount)).to.be.revertedWith(
-              'ERC20: transfer amount exceeds balance'
-            );
-          });
-
-          it('Value will be transfered back, from Staking Address to Owner', async () => {
-            const stakingBal_1 = await upgradeInstance.balanceOf(stakingAcc.address);
-            const listingOwnerBal_1 = await upgradeInstance.balanceOf(listingOwner1.address);
-
-            await listingInstance.connect(listingOwner1).extendOwnership(extensionValues);
-
-            const stakingBal_2 = await upgradeInstance.balanceOf(stakingAcc.address);
-            const listingOwnerBal_2 = await upgradeInstance.balanceOf(listingOwner1.address);
-
-            expect(stakingBal_1.add(extensionValues)).equal(stakingBal_2);
-
-            expect(listingOwnerBal_1.sub(extensionValues)).equal(listingOwnerBal_2);
-
-            const ownership_1 = await listingInstance.ownership();
-            const dailyPayment = await listingInstance.dailyPayment();
-
-            const withdrawTx = listingInstance.connect(listingOwner1).withdraw(withdrawAmount);
-            const expectedOwnershipValue = calNewOwnershipAfterWithdraw({
-              withdrawAmount,
-              existingOwnership: ownership_1,
-              dailyPayment,
-            });
-
-            await expect(withdrawTx)
-              .to.emit(upgradeInstance, 'Withdraw')
-              .withArgs(
-                listingInstance.address,
-                listingOwner1.address,
-                withdrawAmount,
-                ownership_1,
-                expectedOwnershipValue
-              );
-
-            const stakingBal_3 = await upgradeInstance.balanceOf(stakingAcc.address);
-            const listingOwnerBal_3 = await upgradeInstance.balanceOf(listingOwner1.address);
-
-            expect(stakingBal_2.sub(withdrawAmount)).equal(stakingBal_3);
-
-            expect(listingOwnerBal_2.add(withdrawAmount)).equal(listingOwnerBal_3);
-          });
-
-          it('Owner cant withdraw with inactive listing', async () => {
-            await listingInstance.connect(listingOwner1).extendOwnership(extensionValues);
-            const ownership_1 = await listingInstance.ownership();
-
-            await upgradeInstance.connect(deployer).toggleListingStatus(listingAddress);
-
-            await expect(listingInstance.connect(listingOwner1).extendOwnership(extensionValues)).to.be.revertedWith(
-              'Token: Inactive Listing'
-            );
-
-            await expect(listingInstance.connect(listingOwner1).withdraw(withdrawAmount)).to.be.revertedWith(
-              'Token: Inactive Listing'
-            );
-
-            const ownership_2 = await listingInstance.ownership();
-
-            expect(ownership_1).equal(ownership_2);
-          });
-        });
-
-        describe('Stakeholder claiming reward', () => {
-          const registeredAmount = tokenAmountBN(100_000);
-          const ownershipExtension = tokenAmountBN(10_000);
-          const option0 = 0;
-          let stakeStart: BigNumber;
-
-          beforeEach(async () => {
-            await listingInstance.connect(listingOwner1).extendOwnership(ownershipExtension);
-            await listingInstance.connect(stakeholder1).register(registeredAmount, option0);
-            const { _start } = await listingInstance.stakings(option0, stakeholder1.address);
-            stakeStart = _start;
-          });
-
-          beforeEach(async () => {
-            await ethers.provider.send('evm_increaseTime', [86400 * 2]);
-            await ethers.provider.send('evm_mine', []);
-          });
-
-          it('Return expected amount from SA Balance to Stakeholder Balance', async () => {
-            const SABal_1 = await upgradeInstance.balanceOf(stakingAcc.address);
-
-            const SHBal_1 = await upgradeInstance.balanceOf(stakeholder1.address);
-
-            const claimTx = await listingInstance.connect(stakeholder1).claimReward(option0);
-            const claimReceipt = await claimTx.wait();
-            const claimTS = (await ethers.provider.getBlock(claimReceipt.blockNumber)).timestamp;
-
-            const expectedReward = await calculateStakeHolderReward({
-              stakeStart,
-              instance: listingInstance,
-              optionId: option0,
-              stakeholder: stakeholder1.address,
-              blockTS: BigNumber.from(claimTS),
-            });
-
-            const SABal_2 = await upgradeInstance.balanceOf(stakingAcc.address);
-            const SHBal_2 = await upgradeInstance.balanceOf(stakeholder1.address);
-
-            expect(SABal_2).equal(SABal_1.sub(expectedReward));
-            expect(SHBal_2).equal(SHBal_1.add(expectedReward));
-          });
-
-          it('Maximum T is 86% for unforfeited listing', async () => {
-            const listingValue_1 = await listingInstance.value();
-            // Ensure total stake is equal to listing value
-            await listingInstance.connect(stakeholder1).register(listingValue_1, option0);
-
-            await ethers.provider.send('evm_increaseTime', [86400 * 2]);
-            await ethers.provider.send('evm_mine', []);
-
-            const listingValue_2 = await listingInstance.value();
-            const totalStake_2 = await listingInstance.totalStake();
-
-            expect(listingValue_2).equal(totalStake_2);
-
-            const { _start: stakeStart } = await listingInstance.stakings(option0, stakeholder1.address);
-
-            const SABal_1 = await upgradeInstance.balanceOf(stakingAcc.address);
-            const SHBal_1 = await upgradeInstance.balanceOf(stakeholder1.address);
-
-            const claimTx = await listingInstance.connect(stakeholder1).claimReward(option0);
-            const claimReceipt = await claimTx.wait();
-            const claimTS = (await ethers.provider.getBlock(claimReceipt.blockNumber)).timestamp;
-
-            const expectedReward = await calculateStakeHolderReward({
-              stakeStart,
-              instance: listingInstance,
-              optionId: option0,
-              stakeholder: stakeholder1.address,
-              blockTS: BigNumber.from(claimTS),
-            });
-
-            const SABal_2 = await upgradeInstance.balanceOf(stakingAcc.address);
-            const SHBal_2 = await upgradeInstance.balanceOf(stakeholder1.address);
-
-            expect(SABal_2).equal(SABal_1.sub(expectedReward));
-            expect(SHBal_2).equal(SHBal_1.add(expectedReward));
-          });
-          it('Maximum T is 50% for forfeited listing', async () => {
-            const listingValue_1 = await listingInstance.value();
-            const totalStake_1 = await listingInstance.totalStake();
-
-            // Ensure total stake is equal to listing instance
-            await listingInstance.connect(stakeholder2).register(listingValue_1.sub(totalStake_1), option0);
-
-            const initialListingTS = await listingInstance.ownership();
-
-            const blockNumBefore = await ethers.provider.getBlockNumber();
-            const blockBefore = await ethers.provider.getBlock(blockNumBefore);
-            const timestampBefore = blockBefore.timestamp;
-
-            expect(initialListingTS.toNumber() > timestampBefore);
-
-            const timeToIncrease = initialListingTS.toNumber() - timestampBefore;
-            await ethers.provider.send('evm_increaseTime', [timeToIncrease + 1]);
-
-            const blockNumAfter = await ethers.provider.getBlockNumber();
-            const blockAfter = await ethers.provider.getBlock(blockNumAfter);
-            const timestampAfter = blockAfter.timestamp;
-
-            expect(initialListingTS.toNumber() < timestampAfter);
-
-            const SABal_1 = await upgradeInstance.balanceOf(stakingAcc.address);
-            const SHBal_1 = await upgradeInstance.balanceOf(stakeholder1.address);
-
-            const claimTx = await listingInstance.connect(stakeholder1).claimReward(option0);
-            const claimReceipt = await claimTx.wait();
-            const claimTS = (await ethers.provider.getBlock(claimReceipt.blockNumber)).timestamp;
-
-            const expectedReward = await calculateStakeHolderReward({
-              stakeStart,
-              instance: listingInstance,
-              optionId: option0,
-              stakeholder: stakeholder1.address,
-              blockTS: BigNumber.from(claimTS),
-            });
-
-            const SABal_2 = await upgradeInstance.balanceOf(stakingAcc.address);
-            const SHBal_2 = await upgradeInstance.balanceOf(stakeholder1.address);
-
-            expect(SABal_2).equal(SABal_1.sub(expectedReward));
-            expect(SHBal_2).equal(SHBal_1.add(expectedReward));
-          });
-
-          it('User cant claim reward with inactive listing', async () => {
-            const SABal_1 = await upgradeInstance.balanceOf(stakingAcc.address);
-            const SHBal_1 = await upgradeInstance.balanceOf(stakeholder1.address);
-
-            await upgradeInstance.connect(validator).toggleListingStatus(listingAddress);
-
-            await expect(listingInstance.connect(stakeholder1).claimReward(option0)).to.be.revertedWith(
-              'Token: Inactive Listing'
-            );
-
-            const SABal_2 = await upgradeInstance.balanceOf(stakingAcc.address);
-            const SHBal_2 = await upgradeInstance.balanceOf(stakeholder1.address);
-
-            expect(SABal_1).equal(SABal_2);
-            expect(SHBal_1).equal(SHBal_2);
-          });
-
-          it('Cant claim reward if funds balance is insufficient', async () => {
-            const fundsBalance = await upgradeInstance.balanceOf(stakingAcc.address);
-            await upgradeInstance.connect(stakingAcc).transfer(stakingAcc2.address, fundsBalance);
-
-            await expect(listingInstance.connect(stakeholder1).claimReward(option0)).to.be.revertedWith(
-              'ERC20: transfer amount exceeds balance'
-            );
-          });
-
-          it('Stakeholder balance must have at least registered amount to claim reward', async () => {
-            const SHBal_1 = await upgradeInstance.balanceOf(stakeholder1.address);
-            const userStake = await listingInstance.stakings(option0, stakeholder1.address);
-
-            const amountToTransferAway = SHBal_1.sub(userStake._amount.sub(BigNumber.from(1)));
-            await upgradeInstance.connect(stakeholder1).transfer(stakeholder2.address, amountToTransferAway);
-
-            const SHBal_2 = await upgradeInstance.balanceOf(stakeholder1.address);
-            expect(SHBal_2 < userStake._amount);
-            await expect(listingInstance.connect(stakeholder1).claimReward(option0)).to.be.revertedWith(
-              'Listing: Insufficient balance!'
-            );
-          });
-        });
-      });
     });
 
   });

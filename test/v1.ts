@@ -510,6 +510,7 @@ export const v1 = () => {
         await listingInstance.connect(validator).setupOptionReward(0, firstOptionRward);
 
         await listingInstance.connect(validator).updateOwner(newOwner);
+        await expect(listingInstance.connect(validator).updateOwner(ethers.constants.AddressZero)).to.be.revertedWith("Listing: Invalid _newOwner");
 
         await listingInstance.connect(validator).updateValue(newListingValue);
 

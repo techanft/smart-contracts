@@ -12,7 +12,7 @@ contract Listing {
     using SafeMath for uint;
 
     /**
-     * @dev Owner is the address pays tokens to take/maintain the ownership for a listing
+     * @dev Owner is the address pays tokens to take/extend the ownership for a listing
      */
     address public owner;
 
@@ -28,12 +28,12 @@ contract Listing {
     address public validator;
 
     /**
-     * @dev Token contract should be the contract create this listing
+     * @dev Token contract should be the address of {Token} contract which creates this listing
      */
     address public tokenContract;
 
     /**
-     * @dev Ownership value should be in the unix timestamp, determinating if the listing is forfeited by the owner
+     * @dev Ownership value is the unix timestamp, determinating if the listing is forfeited by the owner
      * (ownership < block.timestamp) and ready to be taken by another owner user.
      */
     uint256 public ownership;
@@ -59,9 +59,9 @@ contract Listing {
      * Reward value for each option is set by the validator. 
      *
      * `_isSet` flag is default to false, until the option is set by the validator
-     * The flag is to prevent users from participating in the activities which arent set up by the validator.
+     * This flag is to prevent users from participating in the activities which arent set up by the validator.
      *
-     * Everytime an user participates in an activity, the `_totalStake` is increased by the registered amount
+     * Everytime an user register/unregisters for an activity, the `_totalStake` is increased/decreased respectively
      */
     struct OptionModel {
         uint256 _totalStake;
@@ -71,7 +71,7 @@ contract Listing {
     mapping (uint => OptionModel) public options;
 
     /**
-     * @dev Option reward value is set up by and only by the validator
+     * @dev Option reward value (percentage) is set up by and only by the validator
      * Reward should not exceed 100;
      * The sum of reward values from all options should be 100;
      * 
@@ -99,6 +99,7 @@ contract Listing {
      */
     function updateOwner (address _newOwner) public onlyValidator {
         require(ownership < block.timestamp, "Ownership not expired!");
+        require(_newOwner != address(0), "Listing: Invalid _newOwner");
         owner = _newOwner;
     }
     

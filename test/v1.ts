@@ -4,8 +4,12 @@ import { BigNumber, ContractReceipt } from 'ethers';
 import { ethers, getNamedAccounts, upgrades } from 'hardhat';
 import { Listing, Listing__factory, TestUpgrade, TestUpgrade__factory, Token, Token__factory } from '../typechain';
 import {
-  calculateAvailableTokenForWithdrawing, calculateOwnershipExtension, calculateStakeHolderReward,
-  calNewOwnershipAfterWithdraw, litingAddrFromListingCreationEvent, tokenAmountBN
+  calculateAvailableTokenForWithdrawing,
+  calculateOwnershipExtension,
+  calculateStakeHolderReward,
+  calNewOwnershipAfterWithdraw,
+  litingAddrFromListingCreationEvent,
+  tokenAmountBN,
 } from './utils';
 
 export const v1 = () => {
@@ -27,6 +31,13 @@ export const v1 = () => {
     let ANFTInstance: Token;
     let ANFTAddress: string;
 
+    it('_stakingAddr must not be 0', async () => {
+      const zero = ethers.constants.AddressZero;
+      await expect(upgrades.deployProxy(ANFTFactory, [zero], { initializer: 'initialize' })).to.be.revertedWith(
+        'Token: Invalid _stakingAddr'
+      );
+    });
+
     beforeEach(async () => {
       [
         deployer,
@@ -40,7 +51,7 @@ export const v1 = () => {
         listingOwner2,
         worker1,
         minter,
-        burner
+        burner,
       ] = await ethers.getSigners();
 
       ANFTFactory = await ethers.getContractFactory('Token');
@@ -70,7 +81,7 @@ export const v1 = () => {
       const reServiceBalance = await ANFTInstance.balanceOf(reService.address);
       await ANFTInstance.connect(reService).transfer(deployer.address, reServiceBalance);
     });
-    
+
     describe('Deployment', function () {
       it('deployer account has the DEFAULT_ADMIN_ROLE ', async () => {
         const DEFAULT_ADMIN_ROLE = await ANFTInstance.DEFAULT_ADMIN_ROLE();
@@ -117,7 +128,7 @@ export const v1 = () => {
         expect(await ANFTInstance.balanceOf(REGULATION_FUNDS)).equal(totalSupply.mul(12).div(100));
       });
 
-      it('Address with {DEFAULT_ADMIN_ROLE} is able to grantRole for {MINTER} and {BURNER}',async () => {
+      it('Address with {DEFAULT_ADMIN_ROLE} is able to grantRole for {MINTER} and {BURNER}', async () => {
         const DEFAULT_ADMIN_ROLE = await ANFTInstance.DEFAULT_ADMIN_ROLE();
         expect(await ANFTInstance.hasRole(DEFAULT_ADMIN_ROLE, deployer.address)).to.be.true;
         expect(await ANFTInstance.hasRole(DEFAULT_ADMIN_ROLE, listingOwner1.address)).to.be.false;
@@ -135,7 +146,7 @@ export const v1 = () => {
         await expect(ANFTInstance.connect(deployer).grantRole(BURNER_ROLE, stakeholder2.address)).to.be.not.reverted;
 
         expect(await ANFTInstance.hasRole(MINTER_ROLE, stakeholder1.address)).to.be.true;
-        expect(await ANFTInstance.hasRole(BURNER_ROLE, stakeholder2.address)).to.be.true;        
+        expect(await ANFTInstance.hasRole(BURNER_ROLE, stakeholder2.address)).to.be.true;
       });
 
       it('Only authorized minter can mint, and balance, totalSupply is updated after minting', async () => {
@@ -157,7 +168,7 @@ export const v1 = () => {
         const totalSupply_3 = await ANFTInstance.totalSupply();
         expect(minterBal_2).to.equal(minterBal_3.sub(mintAmount));
         expect(totalSupply_2).to.equal(totalSupply_3.sub(mintAmount));
-      })
+      });
 
       it('Only authorized burner can burn, and balance, totalSupply is updated after burning', async () => {
         const BURNER_ROLE = await ANFTInstance.BURNER();
@@ -183,9 +194,10 @@ export const v1 = () => {
         expect(burnerBal_2).to.equal(burnerBal_3.add(burnAmount));
         expect(totalSupply_2).to.equal(totalSupply_3.add(burnAmount));
 
-        await expect(ANFTInstance.connect(burner).burn(burnAmount)).to.be.revertedWith("ERC20: burn amount exceeds balance");
-      })
-
+        await expect(ANFTInstance.connect(burner).burn(burnAmount)).to.be.revertedWith(
+          'ERC20: burn amount exceeds balance'
+        );
+      });
     });
 
     describe('Listing', () => {
@@ -228,6 +240,12 @@ export const v1 = () => {
         await ANFTInstance.transfer(listingOwner2.address, tokenAmountBN(40_000_000));
       });
 
+      it('Owner address must not be 0', async () => {
+        await expect(
+          ANFTInstance.connect(validator).createListing(ethers.constants.AddressZero, listingId)
+        ).to.be.revertedWith('Token: Invalid _owner');
+      });
+
       it('Only user with the VALIDATOR role can create listing', async () => {
         await expect(
           ANFTInstance.connect(stakeholder1).createListing(stakeholder1.address, listingId)
@@ -235,7 +253,7 @@ export const v1 = () => {
         await expect(ANFTInstance.connect(validator).createListing(stakeholder1.address, listingId)).to.be.not.reverted;
       });
 
-      it('{DEFAULT_ADMIN_ROLE} is able to set validator for a listing',async () => {
+      it('{DEFAULT_ADMIN_ROLE} is able to set validator for a listing', async () => {
         const DEFAULT_ADMIN_ROLE = await ANFTInstance.DEFAULT_ADMIN_ROLE();
         expect(await ANFTInstance.hasRole(DEFAULT_ADMIN_ROLE, deployer.address)).to.be.true;
         expect(await ANFTInstance.hasRole(DEFAULT_ADMIN_ROLE, validator.address)).to.be.false;
@@ -243,13 +261,38 @@ export const v1 = () => {
         expect(await listingInstance.validator()).to.equal(validator.address);
         expect(await listingInstance.validator()).to.not.equal(validator2.address);
 
-        await expect(ANFTInstance.connect(validator).emergencyUpdateListingValidator(listingInstance.address, validator2.address)).to.be.revertedWith("Token: Unauthorized");
-        await expect(ANFTInstance.connect(deployer).emergencyUpdateListingValidator(listingInstance.address, validator2.address)).to.be.not.reverted;
-        
+        await expect(
+          ANFTInstance.connect(validator).emergencyUpdateListingValidator(listingInstance.address, validator2.address)
+        ).to.be.revertedWith('Token: Unauthorized');
+        await expect(
+          ANFTInstance.connect(deployer).emergencyUpdateListingValidator(listingInstance.address, validator2.address)
+        ).to.be.not.reverted;
+
         expect(await listingInstance.validator()).to.equal(validator2.address);
         expect(await listingInstance.validator()).to.not.equal(validator.address);
-        
-      })
+      });
+
+      it("New validator's address cant be the zero address", async () => {
+        await expect(
+          ANFTInstance.connect(deployer).emergencyUpdateListingValidator(
+            listingInstance.address,
+            ethers.constants.AddressZero
+          )
+        ).to.be.revertedWith('Listing: Invalid _validator');
+
+        await expect(
+          listingInstance.connect(validator).updateValidator(ethers.constants.AddressZero)
+        ).to.be.revertedWith('Listing: Invalid _validator');
+      });
+
+      it('{emergencyUpdateListingValidator}: input address must be a valid listing address ', async () => {
+        await expect(
+          ANFTInstance.connect(deployer).emergencyUpdateListingValidator(
+            ethers.constants.AddressZero,
+            listingInstance.address
+          )
+        ).to.be.revertedWith('Token: Invalid Listing');
+      });
 
       it('Validator can update listing ID', async () => {
         const listingId_1 = await listingInstance.listingId();
@@ -277,6 +320,12 @@ export const v1 = () => {
         await expect(ANFTInstance.connect(validator).updateStakingAddress(stakingAcc2.address)).to.be.not.reverted;
         const newStakingAddress = await ANFTInstance.stakingAddress();
         expect(newStakingAddress).equal(stakingAcc2.address);
+      });
+
+      it('Staking address must not be 0', async () => {
+        await expect(ANFTInstance.updateStakingAddress(ethers.constants.AddressZero)).to.be.revertedWith(
+          'Token: Invalid _stakingAddr'
+        );
       });
 
       it('Owner and only owner is able to update worker state', async () => {
@@ -373,7 +422,7 @@ export const v1 = () => {
         const listingStatus_4 = await ANFTInstance.listingStatus(listingAddress);
         expect(listingStatus_4._active).to.be.true;
 
-        // Change listing's validator 
+        // Change listing's validator
         await expect(listingInstance.connect(validator).updateValidator(validator2.address)).to.be.not.reverted;
         const listingValidator_2 = await listingInstance.validator();
         expect(validator.address).to.not.equal(listingValidator_2);
@@ -852,7 +901,7 @@ export const v1 = () => {
 
       describe('Users register for staking', () => {
         const suppliedAmountForStakingAddress = tokenAmountBN(50_000);
-        
+
         const registeredAmount = tokenAmountBN(300);
         const option0 = 0;
         beforeEach(async () => {
@@ -1288,7 +1337,6 @@ export const v1 = () => {
             .withArgs(listingInstance.address, stakeholder1.address, expectedReward, stakeStart, claimTS);
         });
       });
-
     });
 
     describe('Upgradeable', () => {
@@ -1358,8 +1406,6 @@ export const v1 = () => {
         expect(Owner_Bal_2).equal(Owner_Bal_3);
         expect(Owner2_Bal_2).equal(Owner2_Bal_3);
       });
-
     });
-
   });
 };

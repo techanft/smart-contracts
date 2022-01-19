@@ -59,9 +59,10 @@ contract Token is Initializable, ERC20Upgradeable, AccessControlUpgradeable, UUP
      * Staking address is set here
      * 
      * Initial token distribution addresses are also set here since variables can't be initialized outsize 
-     * initialize function
+     * {initialize} function
      *
-     * After deployment, deployer account should be moved to an multisign account
+     * After deployment, {DEFAULT_ADMIN_ROLE} address should be moved to an multisign address and
+     * the contract deployer shall renounce {DEFAULT_ADMIN_ROLE}
      */
 
     function initialize(address _stakingAddr) public initializer {
@@ -128,6 +129,7 @@ contract Token is Initializable, ERC20Upgradeable, AccessControlUpgradeable, UUP
      */
     function createListing(address _owner, uint256 _listingId) public {
         require(hasRole(VALIDATOR, _msgSender()), "Token: Unauthorized");
+        require(_owner != address(0), "Token: Invalid _owner");
         Listing newListing = new Listing(_msgSender(), _owner, _listingId);
         emit ListingCreation(_msgSender(), _owner, address(newListing));    
         listingStatus[address(newListing)]._isCreated = true;    
@@ -155,6 +157,7 @@ contract Token is Initializable, ERC20Upgradeable, AccessControlUpgradeable, UUP
      */    
     function updateStakingAddress (address _stakingAddr) public {
         require(hasRole(DEFAULT_ADMIN_ROLE, _msgSender()), "Token: Unauthorized");
+        require(_stakingAddr != address(0), "Token: Invalid _stakingAddr");
         stakingAddress = _stakingAddr;
         emit UpdateStakingAddr(_stakingAddr);
     }
@@ -165,11 +168,12 @@ contract Token is Initializable, ERC20Upgradeable, AccessControlUpgradeable, UUP
      */    
     function emergencyUpdateListingValidator (address _listingAddr, address _newValidator) public {
         require(hasRole(DEFAULT_ADMIN_ROLE, _msgSender()), "Token: Unauthorized");
+        require(listingStatus[_listingAddr]._isCreated, "Token: Invalid Listing");
         Listing(_listingAddr).updateValidator(_newValidator);
     }
 
     /**
-     * @dev Destroys `amount` tokens from the authorized caller.
+     * @dev Destroys `amount` tokens from the authorized caller's balance
      *
      * See {ERC20-_burn}.
      */
@@ -178,7 +182,7 @@ contract Token is Initializable, ERC20Upgradeable, AccessControlUpgradeable, UUP
     }
 
     /**
-     * @dev Mints `amount` tokens for the authorized caller
+     * @dev Mints `amount` tokens for the authorized caller's balance
      *
      * See {ERC20-_mint}.
      */
@@ -188,7 +192,11 @@ contract Token is Initializable, ERC20Upgradeable, AccessControlUpgradeable, UUP
     }
 
     /**
-     * @notice The below functions are to trigger listing events
+     * @notice The below functions are to trigger listing events.
+     * Important {Listing} events can be "listened" centrally inside this {Token} contract.
+     * Clients can subscribe to every event in {Listing} contracts in this {Token} contract.
+     * (Originally events are emitted from separated {Listing} contracts, but that would be impossible 
+     * for clients to subscribe for every change from different listings)
      */    
     function triggerUpdateListingValueEvent(uint _value) external onlyValidListing {
         emit UpdateValue(_msgSender(), _value);
@@ -246,7 +254,7 @@ contract Token is Initializable, ERC20Upgradeable, AccessControlUpgradeable, UUP
 
     /**
      * @notice Below are events triggered from individual listing contract. These events are off-loaded from
-     * separated contracts to this token contract, so that we can "listen" to listing events in one place
+     * separated contracts to this token contract, so that we can "listen" to listing events in a centralized place
      */
     
     /**

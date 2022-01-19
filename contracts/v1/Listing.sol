@@ -111,6 +111,7 @@ contract Listing {
      */
     function updateValidator (address _validator) public {
         require(msg.sender == validator || msg.sender == tokenContract, "Listing: Unauth!");
+        require(_validator != address(0), "Listing: Invalid _validator");
         validator = _validator;
     }
     
@@ -143,8 +144,8 @@ contract Listing {
     * @dev Total stake represents the tokens are staked for all options
     * 
     * TotalStake is:
-    *   - Increased when user stake (register) for any options
-    *   - Decreased when user unstake (unregister) for any options
+    *   - Increased when user stake (register) for any option
+    *   - Decreased when user unstake (unregister) for any option
     */
     uint256 public totalStake;
 

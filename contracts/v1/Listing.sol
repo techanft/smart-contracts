@@ -107,8 +107,8 @@ contract Listing {
      * @dev Validator can update themselves
      *
      * In case the validator's key is compromised, the {tokenContract} can call the
-     * {emergencyUpdateListingValidator} function (restricted to {DEFAULT_ADMIN_ROLE}) to call this {updateValidator} function
-     * can update the listing's validator
+     * {emergencyUpdateListingValidator} function (restricted to {DEFAULT_ADMIN_ROLE}) to invoke this {updateValidator} function
+     * and update the listing's validator
      */
     function updateValidator (address _validator) public {
         require(msg.sender == validator || msg.sender == tokenContract, "Listing: Unauth!");
@@ -124,14 +124,14 @@ contract Listing {
     {
         "1": {
             "0x000001": {
-                "_start": "1000",
-                "_amount": "100",
+                "_start": 1650347256,
+                "_amount": 100,
                 "_active": true
             }
         }
     }
     * This could be understood as: Address `0x000001` staking for the option with ID = 1. The stake starts at
-    * the timestamp of 100 with the registered amount of 1,000 tokens. The stake is still active (user hasnt canceled)
+    * the timestamp of 1650347256 with the registered amount of 100 tokens. The stake is still active (user hasnt canceled)
     */
     struct StakingModel {
         uint256 _start;

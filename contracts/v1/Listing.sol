@@ -29,7 +29,7 @@ contract Listing {
     /**
      * @dev Token contract should be the address of {Token} contract which creates this listing
      */
-    address public tokenContract;
+    address public immutable tokenContract;
 
     /**
      * @dev Ownership value is the unix timestamp, determinating if the listing is forfeited by the owner

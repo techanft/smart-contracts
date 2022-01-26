@@ -65,7 +65,7 @@ contract Token is Initializable, ERC20Upgradeable, AccessControlUpgradeable, UUP
      * the contract deployer shall renounce {DEFAULT_ADMIN_ROLE}
      */
 
-    function initialize(address _stakingAddr) public initializer {
+    function initialize(address _stakingAddr) external initializer {
         require(_stakingAddr != address(0), "Token: Invalid _stakingAddr");
 
         __UUPSUpgradeable_init();
@@ -127,7 +127,7 @@ contract Token is Initializable, ERC20Upgradeable, AccessControlUpgradeable, UUP
      * 
      * Emits a {ListingCreation} event
      */
-    function createListing(address _owner, uint256 _listingId) public {
+    function createListing(address _owner, uint256 _listingId) external {
         require(hasRole(VALIDATOR, _msgSender()), "Token: Unauthorized");
         require(_owner != address(0), "Token: Invalid _owner");
         Listing newListing = new Listing(_msgSender(), _owner, _listingId);
@@ -144,7 +144,7 @@ contract Token is Initializable, ERC20Upgradeable, AccessControlUpgradeable, UUP
      * The `_listingAddr` must be the address of a created listing
      * 
      */
-    function toggleListingStatus (address _listingAddr) public {
+    function toggleListingStatus (address _listingAddr) external {
         require(listingStatus[_listingAddr]._isCreated, "Token: Invalid Listing");
         address listingValidator = Listing(_listingAddr).validator();
         require(listingValidator == _msgSender() || hasRole(DEFAULT_ADMIN_ROLE, _msgSender()), "Token: Unauthorized");
@@ -155,7 +155,7 @@ contract Token is Initializable, ERC20Upgradeable, AccessControlUpgradeable, UUP
      * @dev Update the funds address. Shall be handy if there's a need in changing the initial address,
      * or the previous address is compromised.
      */    
-    function updateStakingAddress (address _stakingAddr) public {
+    function updateStakingAddress (address _stakingAddr) external {
         require(hasRole(DEFAULT_ADMIN_ROLE, _msgSender()), "Token: Unauthorized");
         require(_stakingAddr != address(0), "Token: Invalid _stakingAddr");
         stakingAddress = _stakingAddr;
@@ -166,7 +166,7 @@ contract Token is Initializable, ERC20Upgradeable, AccessControlUpgradeable, UUP
      * @dev In case a validator's key is compromised, {DEFAULT_ADMIN_ROLE} 
      * is able to update listing's validator
      */    
-    function emergencyUpdateListingValidator (address _listingAddr, address _newValidator) public {
+    function emergencyUpdateListingValidator (address _listingAddr, address _newValidator) external {
         require(hasRole(DEFAULT_ADMIN_ROLE, _msgSender()), "Token: Unauthorized");
         require(listingStatus[_listingAddr]._isCreated, "Token: Invalid Listing");
         Listing(_listingAddr).updateValidator(_newValidator);
@@ -177,7 +177,7 @@ contract Token is Initializable, ERC20Upgradeable, AccessControlUpgradeable, UUP
      *
      * See {ERC20-_burn}.
      */
-    function burn(uint256 amount) public onlyRole(BURNER) {
+    function burn(uint256 amount) external onlyRole(BURNER) {
         _burn(_msgSender(), amount);
     }
 
@@ -187,7 +187,7 @@ contract Token is Initializable, ERC20Upgradeable, AccessControlUpgradeable, UUP
      * See {ERC20-_mint}.
      */
 
-    function mint(address to, uint256 amount) public onlyRole(MINTER) {
+    function mint(address to, uint256 amount) external onlyRole(MINTER) {
         _mint(to, amount);
     }
 

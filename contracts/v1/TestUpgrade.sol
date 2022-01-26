@@ -6,11 +6,11 @@ import "./Token.sol";
 contract TestUpgrade is Token {
     uint256 private version;
 
-    function getVersion () public view returns (uint256)  {
+    function getVersion () external view returns (uint256)  {
         return version;
     }
 
-    function setVersion (uint256 _ver) public {
+    function setVersion (uint256 _ver) external {
         version = _ver;
     }
 }

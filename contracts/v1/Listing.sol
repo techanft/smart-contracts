@@ -78,16 +78,16 @@ contract Listing {
      *
      * For example A, B, C, D are options. Ar, Br, Cr, Dr are the reward values respectively
      */
-    function setupOptionReward (uint256 _optionId, uint256 _reward) public onlyValidator {
+    function setupOptionReward (uint256 _optionId, uint256 _reward) external onlyValidator {
         require(_reward <= 100, "Listing: Invalid reward value");
         options[_optionId]._reward = _reward;
         options[_optionId]._isSet = true;
     }   
-    
+
     /**
      * @dev Validator can update the listing ID
      */
-    function updatelistingId (uint256 _listingId) public onlyValidator {
+    function updatelistingId (uint256 _listingId) external onlyValidator {
         listingId = _listingId;
     }
 
@@ -95,7 +95,7 @@ contract Listing {
      * @dev Validator can update the owner value
      * Owner value can only changeable if the current owner has forfeited the listing
      */
-    function updateOwner (address _newOwner) public onlyValidator {
+    function updateOwner (address _newOwner) external onlyValidator {
         require(ownership < block.timestamp, "Ownership not expired!");
         require(_newOwner != address(0), "Listing: Invalid _newOwner");
         owner = _newOwner;
@@ -108,7 +108,7 @@ contract Listing {
      * {emergencyUpdateListingValidator} function (restricted to {DEFAULT_ADMIN_ROLE}) to invoke this {updateValidator} function
      * and update the listing's validator
      */
-    function updateValidator (address _validator) public {
+    function updateValidator (address _validator) external {
         require(msg.sender == validator || msg.sender == tokenContract, "Listing: Unauth!");
         require(_validator != address(0), "Listing: Invalid _validator");
         validator = _validator;
@@ -166,7 +166,7 @@ contract Listing {
      * @dev Validator can update the listing value to reflect the real estate price in the real world
      * Emits an {UpdateValue} event to make the changes publicly visible
      */
-    function updateValue (uint256 _value) public onlyValidator {
+    function updateValue (uint256 _value) external onlyValidator {
         value = _value;
         Token(tokenContract).triggerUpdateListingValueEvent(_value);
     }
@@ -175,7 +175,7 @@ contract Listing {
      * @dev Validator can update the daily payment value to reflect the real estate price in the real world
      * Emits an {UpdateDailyPayment} event to make the changes publicly visible
      */
-    function updateDailyPayment (uint256 _dailyPayment) public onlyValidator {
+    function updateDailyPayment (uint256 _dailyPayment) external onlyValidator {
         dailyPayment = _dailyPayment;
         Token(tokenContract).triggerUpdatePaymentEvent(_dailyPayment);
     }
@@ -184,7 +184,7 @@ contract Listing {
      * @dev Owner can update worker status. Which means they can choose/remove who
      * can use the listing in real world
      */
-    function updateWorker(address _worker) public {
+    function updateWorker(address _worker) external {
         require(msg.sender == owner, "Listing: Unauth!");
         require(ownership >= block.timestamp, "Listing: Ownership expired");
         workers[_worker] = !workers[_worker];
@@ -209,7 +209,7 @@ contract Listing {
     * Then C is added on top of {block.timestamp} OR the current {ownership} value, depends on whether the listing is forfeited
     */
 
-    function extendOwnership (uint256 _amount) public {
+    function extendOwnership (uint256 _amount) external {
         require(msg.sender == owner || ownership <  block.timestamp, "Listing: Unauth!");
         
         require(_amount >= dailyPayment, "Listing: Insufficient amount!");
@@ -254,7 +254,7 @@ contract Listing {
     * `_amount` shall be transfered from Funds account to user.
     * If the transfer success, the ownership value should be set to current TS
     */
-    function withdraw(uint256 _amount) public {
+    function withdraw(uint256 _amount) external {
         require(msg.sender == owner, "Listing: Unauth!");
         require(ownership >= block.timestamp, "Listing: Ownership expired!");
         require(_amount >= dailyPayment, "Listing: Insufficient amount!");
@@ -322,7 +322,7 @@ contract Listing {
     *
     * Emits an {Register} event
     */
-    function register (uint256 _amount, uint256 _optionId) public onlyActiveListing {
+    function register (uint256 _amount, uint256 _optionId) external onlyActiveListing {
         require(options[_optionId]._isSet, "Listing: Option not available");
 
         StakingModel storage chosenStake = stakings[_optionId][msg.sender];
@@ -368,7 +368,7 @@ contract Listing {
     * Both listing total stake and option total stake is decreased by `_amount`
     * Emits an {Unregister} event
     */
-    function unregister(uint256 _optionId) public onlyActiveListing {
+    function unregister(uint256 _optionId) external onlyActiveListing {
         StakingModel storage chosenStake = stakings[_optionId][msg.sender];
 
         require(chosenStake._active, "Listing: Register first!");

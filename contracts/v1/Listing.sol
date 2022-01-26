@@ -77,7 +77,6 @@ contract Listing {
      * `isSet` is toggled to true for options which were setup
      *
      * For example A, B, C, D are options. Ar, Br, Cr, Dr are the reward values respectively
-     * The validator should set up the option carefully, so Ar + Br + Cr + Dr = 100
      */
     function setupOptionReward (uint256 _optionId, uint256 _reward) public onlyValidator {
         require(_reward <= 100, "Listing: Invalid reward value");

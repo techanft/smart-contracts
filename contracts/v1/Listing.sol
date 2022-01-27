@@ -82,12 +82,14 @@ contract Listing {
         require(_reward <= 100, "Listing: Invalid reward value");
         options[_optionId]._reward = _reward;
         options[_optionId]._isSet = true;
+        Token(tokenContract).triggerUpdateOptionRewardEvent(_optionId, _reward);
     }   
 
     /**
      * @dev Validator can update the listing ID
      */
     function updatelistingId (uint256 _listingId) external onlyValidator {
+        Token(tokenContract).triggerUpdateListingIdEvent(listingId, _listingId);
         listingId = _listingId;
     }
 
@@ -98,6 +100,7 @@ contract Listing {
     function updateOwner (address _newOwner) external onlyValidator {
         require(ownership < block.timestamp, "Ownership not expired!");
         require(_newOwner != address(0), "Listing: Invalid _newOwner");
+        Token(tokenContract).triggerUpdateOwnerEvent(owner, _newOwner);
         owner = _newOwner;
     }
     
@@ -111,6 +114,7 @@ contract Listing {
     function updateValidator (address _validator) external {
         require(msg.sender == validator || msg.sender == tokenContract, "Listing: Unauth!");
         require(_validator != address(0), "Listing: Invalid _validator");
+        Token(tokenContract).triggerUpdateValidatorEvent(validator, _validator);
         validator = _validator;
     }
     
@@ -225,7 +229,6 @@ contract Listing {
             existingOwnership = block.timestamp;
         }
 
-        
         ownership = existingOwnership.add(_amount.mul(86400).div(dailyPayment));
         Token(tokenContract).triggerOwnershipExtensionEvent(existingOwner, owner, existingOwnership, ownership, _amount);
     }

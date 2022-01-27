@@ -435,6 +435,43 @@ export const v1 = () => {
         expect(listingStatus_5._active).to.be.false;
       });
 
+      it('UpdateOptionReward, UpdateListingId, UpdateOwner, UpdateValidator events are emitted with correct args', async () => {
+        // UpdateOptionReward
+        const updateOptionRewardBody = {
+          option: 1,
+          value: 20,
+        };
+        await expect(
+          listingInstance
+            .connect(validator)
+            .setupOptionReward(updateOptionRewardBody.option, updateOptionRewardBody.value)
+        )
+          .to.emit(ANFTInstance, 'UpdateOptionReward')
+          .withArgs(listingInstance.address, updateOptionRewardBody.option, updateOptionRewardBody.value);
+
+        // UpdateListingId
+        const prevListingId = await listingInstance.listingId();
+        const newlistingId = prevListingId.add(1);
+        await expect(listingInstance.connect(validator).updatelistingId(newlistingId))
+          .to.emit(ANFTInstance, 'UpdateListingId')
+          .withArgs(listingInstance.address, prevListingId, newlistingId);
+
+        // UpdateOwner
+        const prevOwner = await listingInstance.owner();
+        expect(prevOwner).not.equal(listingOwner2.address);
+        await expect(listingInstance.connect(validator).updateOwner(listingOwner2.address))
+          .to.emit(ANFTInstance, 'UpdateOwner')
+          .withArgs(listingInstance.address, prevOwner, listingOwner2.address);
+
+        // UpdateValidator
+        const prevValidator = await listingInstance.validator();
+        expect(prevValidator).equal(validator.address);
+        expect(prevValidator).not.equal(validator2.address);
+        await expect(listingInstance.connect(validator).updateValidator(validator2.address))
+          .to.emit(ANFTInstance, 'UpdateValidator')
+          .withArgs(listingInstance.address, validator.address, validator2.address);
+      });
+
       it('Listing initial ownership is equals to block.timestamp', async () => {
         const creationBlockTimeStamp = (await ethers.provider.getBlock(listingCreationBlock)).timestamp;
         expect(await listingInstance.ownership()).to.equal(creationBlockTimeStamp);
@@ -510,7 +547,9 @@ export const v1 = () => {
         await listingInstance.connect(validator).setupOptionReward(0, firstOptionRward);
 
         await listingInstance.connect(validator).updateOwner(newOwner);
-        await expect(listingInstance.connect(validator).updateOwner(ethers.constants.AddressZero)).to.be.revertedWith("Listing: Invalid _newOwner");
+        await expect(listingInstance.connect(validator).updateOwner(ethers.constants.AddressZero)).to.be.revertedWith(
+          'Listing: Invalid _newOwner'
+        );
 
         await listingInstance.connect(validator).updateValue(newListingValue);
 

@@ -231,6 +231,22 @@ contract Token is Initializable, ERC20Upgradeable, AccessControlUpgradeable, UUP
         emit Unregister(_msgSender(), _stakeholder, _optionId);
     }
 
+    function triggerUpdateOptionRewardEvent(uint256 _optionId, uint256 _reward) external onlyValidListing {
+        emit UpdateOptionReward(_msgSender(), _optionId, _reward);
+    }
+
+    function triggerUpdateListingIdEvent(uint256 _prevId, uint256 _newId) external onlyValidListing {
+        emit UpdateListingId(_msgSender(), _prevId, _newId);
+    }
+
+    function triggerUpdateOwnerEvent(address _prevOwner, address _newOwner) external onlyValidListing {
+        emit UpdateOwner(_msgSender(), _prevOwner, _newOwner);
+    }
+
+    function triggerUpdateValidatorEvent(address _prevValidator, address _newValidator) external onlyValidListing {
+        emit UpdateValidator(_msgSender(), _prevValidator, _newValidator);
+    }
+
      /**
      * @dev Modifier, making sure the listing caller is a valid listing
      */
@@ -323,5 +339,32 @@ contract Token is Initializable, ERC20Upgradeable, AccessControlUpgradeable, UUP
      */
     event Unregister(address _listing, address _stakeholder, uint256 _optionId);
 
+    /** @dev Emitted when a listing's validator update option reward
+     *
+     * `_optionId` is the updated option
+     * `_reward` is the reward value
+     */
+    event UpdateOptionReward(address _listing, uint256 _optionId, uint256 _reward);
+    
+    /** @dev Emitted when a listing's validator update listing's ID
+     *
+     * `_prevId` is the previous id
+     * `_newId` is the new id
+     */
+    event UpdateListingId(address _listing, uint256 _prevId, uint256 _newId);
+
+    /** @dev Emitted when a listing's validator update listing's owner
+     *
+     * `_prevOwner` is the previous owner
+     * `_newOwner` is the new owner
+     */
+    event UpdateOwner(address _listing, address _prevOwner, address _newOwner);
+
+    /** @dev Emitted when a listing's validator is updated
+     *
+     * `_prevValidator` is the previous validator
+     * `_newValidator` is the new validator
+     */
+    event UpdateValidator(address _listing, address _prevValidator, address _newValidator);
 
 }

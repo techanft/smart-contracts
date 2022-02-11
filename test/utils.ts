@@ -1,4 +1,4 @@
-import { BigNumber } from 'ethers';
+import { BigNumber, ethers } from 'ethers';
 import { Listing } from '../typechain';
 import { Event } from '@ethersproject/contracts';
 import { convertBnToDecimal, convertDecimalToBn } from '../scripts/BO/utils';
@@ -128,4 +128,11 @@ export const calculateStakeHolderReward = async ({
 
 export const getCurrentUnix = () => {
   return Math.round(+new Date()/1000);
+}
+
+export const getCurrentBlockTS = async (provider: ethers.providers.JsonRpcProvider) => {
+  const currentBlockNo = await provider.getBlockNumber();
+  const currentBlockInfo = await provider.getBlock(currentBlockNo);
+  const currentBlockTS = currentBlockInfo.timestamp;   
+  return currentBlockTS;
 }

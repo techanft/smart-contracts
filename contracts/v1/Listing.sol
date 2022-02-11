@@ -98,7 +98,7 @@ contract Listing {
      * Owner value can only changeable if the current owner has forfeited the listing
      */
     function updateOwner (address _newOwner) external onlyValidator {
-        require(ownership < block.timestamp, "Ownership not expired!");
+        require(ownership - 86400 <  block.timestamp, "Owner hasn't forfeited!");
         require(_newOwner != address(0), "Listing: Invalid _newOwner");
         Token(tokenContract).triggerUpdateOwnerEvent(owner, _newOwner);
         owner = _newOwner;
@@ -198,8 +198,10 @@ contract Listing {
     /**
     * @dev Owner can extend ownership by transfering tokens to the staking address
     * 
-    * sender must be listing owner owner to extend listing ownership, OR the ownership value is in the past (current owner forfeits the listing).
-    * In the forfeit case, the sender will be the new owner, and new ownership would be time credit added on top of current timestamp
+    * Definition: A listing is forfeited if {ownership - 86400 <  block.timestamp} (24 hours before the ownership actually expires)
+    * Sender can extend the ownership for the listing in the following cases:
+    * Case 1: If the listing isn't forfeited, sender must be the current owner
+    * Case 2: If the listing is forfeited, sender could be anyone. Sender would become the new owner;
     *
     * sender must transfer at least {dailyPayment} amount (Owns the listing for at least 1.0 day)
     *
@@ -214,7 +216,7 @@ contract Listing {
     */
 
     function extendOwnership (uint256 _amount) external {
-        require(msg.sender == owner || ownership <  block.timestamp, "Listing: Unauth!");
+        require(msg.sender == owner || ownership - 86400 <  block.timestamp, "Listing: Unauth!");
         
         require(_amount >= dailyPayment, "Listing: Insufficient amount!");
 
@@ -224,7 +226,7 @@ contract Listing {
         uint256 existingOwnership = ownership;
         address existingOwner = owner;
         
-        if (existingOwnership < block.timestamp) {
+        if (existingOwnership - 86400 < block.timestamp) {
             owner = msg.sender;
             existingOwnership = block.timestamp;
         }

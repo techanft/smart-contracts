@@ -8,6 +8,7 @@ import {
   calculateOwnershipExtension,
   calculateStakeHolderReward,
   calNewOwnershipAfterWithdraw,
+  getCurrentBlockTS,
   litingAddrFromListingCreationEvent,
   tokenAmountBN,
 } from './utils';
@@ -753,46 +754,102 @@ export const v1 = () => {
           // phan tich / design / phat trien / test / fix / deploy/ maintain
         });
 
-        it('If the current ownership forfeits (the ownership value is in the past), new user can extend ownership and become the listing owner', async () => {
+        it('If the current ownership forfeits ({ownership - 86400 <  block.timestamp}), new user can extend ownership and become the listing owner', async () => {
           const initialOwner = await listingInstance.owner();
           expect(initialOwner).equal(listingOwner1.address);
 
+          const DP = await listingInstance.dailyPayment();
+          await listingInstance.connect(listingOwner1).extendOwnership(DP);
+
           const initalOwnership = await listingInstance.ownership();
+
           const extensionTx = await listingInstance.connect(listingOwner2).extendOwnership(extensionValues);
+
           const extensionReceipt = await extensionTx.wait();
           const extendOwnershipBlockTimeStamp = (await ethers.provider.getBlock(extensionReceipt.blockNumber))
             .timestamp;
-          expect(initalOwnership.toNumber() < extendOwnershipBlockTimeStamp);
 
+          expect(initalOwnership.toNumber() - 86400 < extendOwnershipBlockTimeStamp);
           const newOwner = await listingInstance.owner();
           expect(newOwner).not.equal(listingOwner1.address);
           expect(newOwner).equal(listingOwner2.address);
         });
 
-        it('If the current ownership doesnt forfeit (the ownership value is extended into the future), new user cant extend ownership and become listing owner', async () => {
+        it('If the current ownership doesnt forfeit ({ownership - 86400 >=  block.timestamp}), new user cant extend ownership and become listing owner', async () => {
           await listingInstance.connect(listingOwner1).extendOwnership(extensionValues);
           const listingOwner_1 = await listingInstance.owner();
+
+          const initalOwnership = await listingInstance.ownership();
+          const currentBlockNo = await ethers.provider.getBlockNumber();
+          const currentBlockInfo = await ethers.provider.getBlock(currentBlockNo);
+          const currentBlockTS = currentBlockInfo.timestamp;
+          expect(initalOwnership.toNumber() - 86400 >= currentBlockTS).to.be.true;
 
           const newExtensionValue = tokenAmountBN(50_000);
           await expect(listingInstance.connect(listingOwner2).extendOwnership(newExtensionValue)).to.be.revertedWith(
             'Listing: Unauth!'
           );
-
           const listingOwner_2 = await listingInstance.owner();
           expect(listingOwner_2).equal(listingOwner_1);
           expect(listingOwner_2).not.equal(listingOwner2.address);
         });
 
+        it('new owner can only take the listing from another owner if {ownership - 86400 <  block.timestamp}', async () => {
+          const initialOwner = await listingInstance.owner();
+          const DP = await listingInstance.dailyPayment();
+          expect(initialOwner).equal(listingOwner1.address);
+          expect(initialOwner).not.equal(listingOwner2.address);
+
+          // Extend for 2 days
+          await listingInstance.connect(listingOwner1).extendOwnership(DP.mul(2));
+
+          const currentTS_1 = await getCurrentBlockTS(ethers.provider);
+          const ownership = await listingInstance.ownership();
+
+          expect(ownership.toNumber() - 86400 < currentTS_1).to.be.false;
+
+          await expect(listingInstance.connect(listingOwner2).extendOwnership(DP)).to.be.revertedWith(
+            'Listing: Unauth!'
+          );
+   
+          // Set next block TS is one day more plus 1 second
+          const preDefinedOverrideTS = currentTS_1 + 86401;
+          await ethers.provider.send('evm_setNextBlockTimestamp', [preDefinedOverrideTS]);
+          await ethers.provider.send('evm_mine', []);
+
+          const currentTS_2 = await getCurrentBlockTS(ethers.provider);
+            
+
+          expect(ownership.toNumber() - 86400 < currentTS_2).to.be.true;
+          await expect(listingInstance.connect(listingOwner2).extendOwnership(DP)).to.be.not.reverted;
+
+        });
+
         it("If the current ownership doesnt forfeit, the validator can't change the owner", async () => {
           await listingInstance.connect(listingOwner1).extendOwnership(extensionValues);
+
+          const ownership = await listingInstance.ownership();
           const listingOwner_1 = await listingInstance.owner();
 
+          const currentTS_1 = await getCurrentBlockTS(ethers.provider);
+          expect(ownership.toNumber() - 86400 < currentTS_1).to.be.false;
           await expect(listingInstance.connect(validator).updateOwner(listingOwner2.address)).to.be.revertedWith(
-            'Ownership not expired!'
+            "Owner hasn't forfeited!"
           );
-
           const listingOwner_2 = await listingInstance.owner();
           expect(listingOwner_2).equal(listingOwner_1);
+
+          // The next block TS is the last day minus 1 second
+          const preDefinedOverrideTS = ownership.toNumber() - 86399;
+          await ethers.provider.send('evm_setNextBlockTimestamp', [preDefinedOverrideTS]);
+          await ethers.provider.send('evm_mine', []);
+          const currentTS_2 = await getCurrentBlockTS(ethers.provider);
+          expect(ownership.toNumber() - 86400 < currentTS_2).to.be.true;
+
+          await expect(listingInstance.connect(validator).updateOwner(listingOwner2.address)).to.be.not.reverted;
+          const listingOwner_3 = await listingInstance.owner();
+          expect(listingOwner_3).not.equal(listingOwner1.address);
+          expect(listingOwner_3).equal(listingOwner2.address);
         });
       });
 

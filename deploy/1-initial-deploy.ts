@@ -24,4 +24,6 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
 func.tags = ['init-deploy'];
 export default func;
-// npx hardhat --network bsc-testnet deploy --tags init-deploy
+// 1. hh --network bsc-testnet deploy --tags init-deploy
+// 2. hh run ./scripts/BO/manageRoles.ts && hh run ./scripts/BO/createListing.ts
+// 3. hh run ./scripts/BO/listingManagement.ts && hh run ./scripts/tokenActions.ts

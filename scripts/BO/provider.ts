@@ -11,7 +11,6 @@ const bsctestnet_config = {
         const provider = new ethers.providers.InfuraProvider("rinkeby", process.env.INFURA_RINKEBY_PROJECT_ID)
         const provider = new ethers.providers.InfuraProvider("goerli", process.env.INFURA_GOERLI_PROJECT_ID)
 */
-// const provider = new ethers.providers.JsonRpcProvider(bsctestnet_url, bsctestnet_config);
-const provider = new ethers.providers.InfuraProvider("rinkeby", process.env.INFURA_RINKEBY_PROJECT_ID)
+const provider = new ethers.providers.JsonRpcProvider(bsctestnet_url, bsctestnet_config);
 export default provider;
 

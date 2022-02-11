@@ -1,8 +1,6 @@
 import { ethers } from 'ethers';
-// import proxyArtifact from '../../deployments/bsc-testnet/Token_Proxy';
-// import implementationArtifact from '../../deployments/bsc-testnet/Token_Implementation';
-import proxyArtifact from '../../deployments/rinkeby/Token_Proxy';
-import implementationArtifact from '../../deployments/rinkeby/Token_Implementation';
+import proxyArtifact from '../../deployments/bsc-testnet/Token_Proxy';
+import implementationArtifact from '../../deployments/bsc-testnet/Token_Implementation';
 
 
 import { getWalletByPK } from '../../utils';
@@ -53,12 +51,8 @@ const deployerRenounce = async () => {
 
 
 const main = async () => {
-  // grantValidatorRole("0x43f96726B105b448798b6eebB04a09ee99921608")
+  grantValidatorRole("0x43f96726B105b448798b6eebB04a09ee99921608")
   // grantAdminRole("0x4230fC631B939fAB31485682D6cfC196018DB848");
-  deployerRenounce();
+  // deployerRenounce();
 };
 main();
-
-
-// hh run ./scripts/BO/manageRoles.ts && hh run ./scripts/BO/createListing.ts
-// hh run ./scripts/BO/listingManagement.ts && hh run ./scripts/tokenActions.ts

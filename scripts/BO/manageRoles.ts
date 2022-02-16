@@ -1,6 +1,8 @@
 import { ethers } from 'ethers';
-import proxyArtifact from '../../deployments/bsc-testnet/Token_Proxy';
-import implementationArtifact from '../../deployments/bsc-testnet/Token_Implementation';
+// import proxyArtifact from '../../deployments/bsc-testnet/Token_Proxy';
+// import implementationArtifact from '../../deployments/bsc-testnet/Token_Implementation';
+import proxyArtifact from '../../deployments/rinkeby/Token_Proxy';
+import implementationArtifact from '../../deployments/rinkeby/Token_Implementation';
 
 
 import { getWalletByPK } from '../../utils';

@@ -27,7 +27,7 @@ const config: HardhatUserConfig = {
     coinmarketcap: process.env.COINMCAP_API_KEY as string, 
     gasPrice: 6,
     // @ts-ignore
-    ethPrice: 600,
+    ethPrice: 450,
   },
   networks: {
     localhost: {

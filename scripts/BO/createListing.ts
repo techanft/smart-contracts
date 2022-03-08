@@ -3,10 +3,10 @@ import { litingAddrFromListingCreationEvent } from '../../test/utils';
 import { getWalletByPK } from '../../utils';
 import { TokenInstance } from './manageRoles';
 
-const { VALIDATOR_PK } = process.env;
+const { VALIDATOR_PK, MAINNET_VALIDATOR_PRIVATE_KEY } = process.env;
 
 const createListing = async (listingID: string | number, ownerAddr: string) => {
-  const validatorWallet = getWalletByPK(VALIDATOR_PK as string);
+  const validatorWallet = getWalletByPK(MAINNET_VALIDATOR_PRIVATE_KEY as string);
 
   const contractWithSigner = await TokenInstance.connect(validatorWallet);
 
@@ -20,8 +20,9 @@ const createListing = async (listingID: string | number, ownerAddr: string) => {
 };
 
 const main = async () => {
-  const owner = '0x42dFeEDCD1575484DfdC84c216fAD75f3e20528D'; 
+  const owner = '0x6ad3493ADd46c8d95610388Ab88bEeFE75743afC'; 
 
+  await createListing(1, owner);
   await createListing(2, owner);
   await createListing(3, owner);
   await createListing(4, owner);
@@ -31,6 +32,6 @@ const main = async () => {
   await createListing(8, owner);
   await createListing(9, owner);
   await createListing(10, owner);
-  await createListing(11, owner);
+  
 };
 main();

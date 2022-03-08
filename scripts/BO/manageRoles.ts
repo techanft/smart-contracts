@@ -1,15 +1,15 @@
 import { ethers } from 'ethers';
 // import proxyArtifact from '../../deployments/bsc-testnet/Token_Proxy';
 // import implementationArtifact from '../../deployments/bsc-testnet/Token_Implementation';
-import proxyArtifact from '../../deployments/rinkeby/Token_Proxy';
-import implementationArtifact from '../../deployments/rinkeby/Token_Implementation';
+import proxyArtifact from '../../deployments/bsc-mainnet/Token_Proxy';
+import implementationArtifact from '../../deployments/bsc-mainnet/Token_Implementation';
 
 
 import { getWalletByPK } from '../../utils';
 import provider from './provider';
 import { Token } from '../../typechain';
 
-const { TESTNET_DEPLOYER_PRIVATE_KEY } = process.env;
+const { TESTNET_DEPLOYER_PRIVATE_KEY, MAINNET_DEPLOYER_PRIVATE_KEY } = process.env;
 
 const tokenAddress = proxyArtifact.address;
 const tokenABI = implementationArtifact.abi;
@@ -17,14 +17,15 @@ const tokenABI = implementationArtifact.abi;
 export const TokenInstance = <Token>new ethers.Contract(tokenAddress, tokenABI, provider);
 
 const grantValidatorRole = async (validatorAddress: string) => {
-  if (!TESTNET_DEPLOYER_PRIVATE_KEY) return;
+  if (!MAINNET_DEPLOYER_PRIVATE_KEY) return;
 
-  const deployerWallet = getWalletByPK(TESTNET_DEPLOYER_PRIVATE_KEY);
-
+  const deployerWallet = getWalletByPK(MAINNET_DEPLOYER_PRIVATE_KEY);
+  
   const contractWithSigner = await TokenInstance.connect(deployerWallet);
   const validatorRole = await contractWithSigner.VALIDATOR();
   const tx = await contractWithSigner.grantRole(validatorRole, validatorAddress);
   await tx.wait();
+  console.log("tx.hash: ", tx.hash)
 };
 
 const grantAdminRole = async (multiSigAddr: string) => {
@@ -53,7 +54,7 @@ const deployerRenounce = async () => {
 
 
 const main = async () => {
-  grantValidatorRole("0x43f96726B105b448798b6eebB04a09ee99921608")
+  grantValidatorRole("0x6ad3493ADd46c8d95610388Ab88bEeFE75743afC")
   // grantAdminRole("0x4230fC631B939fAB31485682D6cfC196018DB848");
   // deployerRenounce();
 };

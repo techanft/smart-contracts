@@ -41,6 +41,14 @@ const config: HardhatUserConfig = {
       ],
       chainId: 97,
     },
+    'bsc-mainnet': {
+      url: process.env.BSC_MAINNET_URL,
+      accounts: [
+        process.env.MAINNET_DEPLOYER_PRIVATE_KEY as string,
+        process.env.MAINNET_STAKING_ADDR_PRIVATE_KEY as string,
+      ],
+      chainId: 56,
+    },
     'rinkeby': {
       url: process.env.RINKEBY_URL,
       accounts: [

@@ -9,12 +9,12 @@ const { VALIDATOR_PK, MAINNET_VALIDATOR_PRIVATE_KEY } = process.env;
 // Replace your listing validator PK here
 
 const validatorWallet = getWalletByPK(VALIDATOR_PK as string);
-const mainValidatorWallet = getWalletByPK(MAINNET_VALIDATOR_PRIVATE_KEY as string);
+// const mainValidatorWallet = getWalletByPK(MAINNET_VALIDATOR_PRIVATE_KEY as string);
 
-const listingAddress = '0xd432989e93511C3a03caB4d8Ec35322F8DfD4102';
+const listingAddress = 'a listing address';
 const listingInstance = new ethers.Contract(listingAddress, listingArtifact.abi, provider);
 
-const contractWithValidatedSigner = listingInstance.connect(mainValidatorWallet);
+const contractWithValidatedSigner = listingInstance.connect(validatorWallet);
 
 const setupOptionReward = async (optionID: number | string, rewardValue: number | string) => {
   const tx = await contractWithValidatedSigner.setupOptionReward(optionID, rewardValue);
@@ -56,7 +56,7 @@ const massUpdateDPandValue = async () => {
   for (let index = 0; index < listingAddrs.length; index++) {
     const addr = listingAddrs[index];
     const listingInstance = new ethers.Contract(addr, listingArtifact.abi, provider);
-    const contractWithValidatedSigner = listingInstance.connect(mainValidatorWallet);
+    const contractWithValidatedSigner = listingInstance.connect(validatorWallet);
 
     const lisingValue = convertDecimalToBn(String(getRandomInt(50000, 100000)));
     const dailyPaymentValue = convertDecimalToBn(String(getRandomInt(20, 500)));
@@ -89,7 +89,7 @@ const massUpdateListingOptions = async () => {
   for (let i = 0; i < listingAddrs.length; i++) {
     const addr = listingAddrs[i];
     const listingInstance = new ethers.Contract(addr, listingArtifact.abi, provider);
-    const contractWithValidatedSigner = listingInstance.connect(mainValidatorWallet);
+    const contractWithValidatedSigner = listingInstance.connect(validatorWallet);
 
     const optionValues = randomizeArray();
     console.log(`optionValues: ${optionValues}`);
@@ -111,9 +111,9 @@ const massUpdateListingOptions = async () => {
 }
 
 const main = async () => {
-  // await massUpdateDPandValue();
-  // await massUpdateListingOptions();
-  await updateListingId(11);
+  await massUpdateDPandValue();
+  await massUpdateListingOptions();
+  // await updateListingId(11);
 }
 main().catch((error) => {
   console.error(error);

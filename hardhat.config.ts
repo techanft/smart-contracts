@@ -33,6 +33,14 @@ const config: HardhatUserConfig = {
     localhost: {
       saveDeployments: false,
     },
+    'cronos-testnet': {
+      url: process.env.CRONOS_TESTNET_URL,
+      accounts: [
+        process.env.TESTNET_DEPLOYER_PRIVATE_KEY as string,
+        process.env.TESTNET_STAKING_ADDR_PRIVATE_KEY as string,
+      ],
+      chainId: 338,
+    },
     'bsc-testnet': {
       url: process.env.BSC_TESTNET_URL,
       accounts: [

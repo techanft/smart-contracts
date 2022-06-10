@@ -1,8 +1,10 @@
 import { ethers } from 'ethers';
 // import proxyArtifact from '../../deployments/bsc-testnet/Token_Proxy';
 // import implementationArtifact from '../../deployments/bsc-testnet/Token_Implementation';
-import proxyArtifact from '../../deployments/bsc-mainnet/Token_Proxy';
-import implementationArtifact from '../../deployments/bsc-mainnet/Token_Implementation';
+// import proxyArtifact from '../../deployments/bsc-mainnet/Token_Proxy';
+// import implementationArtifact from '../../deployments/bsc-mainnet/Token_Implementation';
+import proxyArtifact from '../../deployments/cronos-testnet/Token_Proxy';
+import implementationArtifact from '../../deployments/cronos-testnet/Token_Implementation';
 
 
 import { getWalletByPK } from '../../utils';
@@ -17,9 +19,9 @@ const tokenABI = implementationArtifact.abi;
 export const TokenInstance = <Token>new ethers.Contract(tokenAddress, tokenABI, provider);
 
 const grantValidatorRole = async (validatorAddress: string) => {
-  if (!MAINNET_DEPLOYER_PRIVATE_KEY) return;
+  if (!TESTNET_DEPLOYER_PRIVATE_KEY) return;
 
-  const deployerWallet = getWalletByPK(MAINNET_DEPLOYER_PRIVATE_KEY);
+  const deployerWallet = getWalletByPK(TESTNET_DEPLOYER_PRIVATE_KEY);
   
   const contractWithSigner = await TokenInstance.connect(deployerWallet);
   const validatorRole = await contractWithSigner.VALIDATOR();
@@ -54,7 +56,7 @@ const deployerRenounce = async () => {
 
 
 const main = async () => {
-  grantValidatorRole("0x6ad3493ADd46c8d95610388Ab88bEeFE75743afC")
+  grantValidatorRole("0x43f96726B105b448798b6eebB04a09ee99921608")
   // grantAdminRole("0x4230fC631B939fAB31485682D6cfC196018DB848");
   // deployerRenounce();
 };

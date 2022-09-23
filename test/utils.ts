@@ -136,3 +136,8 @@ export const getCurrentBlockTS = async (provider: ethers.providers.JsonRpcProvid
   const currentBlockTS = currentBlockInfo.timestamp;   
   return currentBlockTS;
 }
+
+export const messageFromMessageEvent = (events: Event[] | undefined): string => {
+  const MessageEvent = events?.find(({ event }) => event == 'Message');
+  return MessageEvent?.args?._message;
+};

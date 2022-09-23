@@ -2,7 +2,7 @@ import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/dist/src/signers';
 import { expect } from 'chai';
 import { BigNumber, ContractReceipt } from 'ethers';
 import { ethers, getNamedAccounts, upgrades } from 'hardhat';
-import { Listing, Listing__factory, TestUpgrade, TestUpgrade__factory, Token, Token__factory } from '../typechain';
+import { Listing, Listing__factory, TestUpgrade, TestUpgrade__factory, Token, Token__factory } from '../../typechain';
 import {
   calculateAvailableTokenForWithdrawing,
   calculateOwnershipExtension,
@@ -11,7 +11,7 @@ import {
   getCurrentBlockTS,
   litingAddrFromListingCreationEvent,
   tokenAmountBN,
-} from './utils';
+} from '../utils';
 
 export const v1 = () => {
   describe('ANFT Token', () => {
